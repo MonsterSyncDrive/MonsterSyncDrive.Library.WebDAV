@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>
 /// 配置释放资源锁时的锁令牌和通用请求条件。
@@ -45,5 +45,8 @@ public class UnlockParameters : WebDavRequestOptions
     /// 获取要释放的锁令牌 URI。
     /// </summary>
     /// <value>发送时规范化外层尖括号，使用 Lock-Token 头；不会使用 If 头代替解锁令牌。</value>
-    public string LockToken { get; }
+    public string LockToken
+    {
+        get;
+    }
 }

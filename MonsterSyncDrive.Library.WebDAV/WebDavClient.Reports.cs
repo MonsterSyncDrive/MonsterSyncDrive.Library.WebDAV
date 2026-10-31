@@ -21,11 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Request;
+using MonsterSyncDrive.Library.WebDAV.Response;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Request;
-using MonsterSyncDrive.WebDAV.Response;
 
 namespace MonsterSyncDrive.WebDAV;
 
@@ -42,7 +42,10 @@ public sealed partial class WebDavClient
     /// <param name="options">请求条件、取消和自定义头；null 使用默认设置。</param>
     /// <returns>完整 XML 报告、可选资源投影及响应头快照。</returns>
     public Task<WebDavReportResponse> ReportDocumentAsync(string requestUri, XElement report,
-        WebDavRequestOptions? options = null) => ReportDocumentAsync(CreateUri(requestUri), report, options);
+        WebDavRequestOptions? options = null)
+    {
+        return ReportDocumentAsync(CreateUri(requestUri), report, options);
+    }
 
     /// <summary>
     /// 发送通用 XML REPORT，支持任意 XML 结果根并明确保留错误正文状态。
@@ -56,15 +59,15 @@ public sealed partial class WebDavClient
         WebDavRequestOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(report);
-        var response = await SendDocumentRequestAsync(requestUri, "REPORT", report, options).ConfigureAwait(false);
-        if (response.StatusCode is >= 200 and < 300 and not 204 && response.Document is null)
-            throw new InvalidDataException("A successful XML REPORT requires an XML response body.");
-        return new WebDavReportResponse(response.StatusCode, response.Description, response.Document, response.Resources)
-        {
-            Headers = response.Headers,
-            Error = response.Error,
-            Representation = response.Representation
-        };
+        WebDavDocumentResponse response = await SendDocumentRequestAsync(requestUri, "REPORT", report, options).ConfigureAwait(false);
+        return response.StatusCode is >= 200 and < 300 and not 204 && response.Document is null
+            ? throw new InvalidDataException("A successful XML REPORT requires an XML response body.")
+            : new WebDavReportResponse(response.StatusCode, response.Description, response.Document, response.Resources)
+            {
+                Headers = response.Headers,
+                Error = response.Error,
+                Representation = response.Representation
+            };
     }
 
     /// <summary>
@@ -73,8 +76,10 @@ public sealed partial class WebDavClient
     /// <param name="requestUri">要同步的集合 URI 引用。</param>
     /// <param name="parameters">令牌、层级、属性和结果限制；null 进行默认首次列举。</param>
     /// <returns>单页同步响应；令牌失效以 IsTokenInvalid 表达，不自动全量回退。</returns>
-    public Task<WebDavSyncResponse> SyncCollectionAsync(string requestUri, SyncCollectionParameters? parameters = null) =>
-        SyncCollectionAsync(CreateUri(requestUri), parameters);
+    public Task<WebDavSyncResponse> SyncCollectionAsync(string requestUri, SyncCollectionParameters? parameters = null)
+    {
+        return SyncCollectionAsync(CreateUri(requestUri), parameters);
+    }
 
     /// <summary>
     /// 使用绝对或相对 URI 执行一次 RFC 6578 集合报告。
@@ -85,20 +90,20 @@ public sealed partial class WebDavClient
     public async Task<WebDavSyncResponse> SyncCollectionAsync(Uri requestUri, SyncCollectionParameters? parameters = null)
     {
         parameters ??= new SyncCollectionParameters();
-        var body = parameters.ToReportElement();
-        var response = await SendDocumentRequestAsync(requestUri, "REPORT", body, parameters,
+        XElement body = parameters.ToReportElement();
+        WebDavDocumentResponse response = await SendDocumentRequestAsync(requestUri, "REPORT", body, parameters,
             [new("Depth", "0")]).ConfigureAwait(false);
-        var report = new WebDavReportResponse(response.StatusCode, response.Description, response.Document, response.Resources)
+        WebDavReportResponse report = new(response.StatusCode, response.Description, response.Document, response.Resources)
         {
             Headers = response.Headers,
             Error = response.Error,
             Representation = response.Representation
         };
-        var page = new WebDavSyncResponse(report, ResolveUri(requestUri), parameters.Level, parameters.SyncToken,
+        WebDavSyncResponse page = new(report, ResolveUri(requestUri), parameters.Level, parameters.SyncToken,
             response.WasMinimalResponseRequested);
-        if (page.StatusCode == 207 && parameters.Limit is { } limit && page.Changes.Count > limit)
-            throw new InvalidDataException("The server returned more synchronization changes than the requested limit.");
-        return page;
+        return page.StatusCode == 207 && parameters.Limit is { } limit && page.Changes.Count > limit
+            ? throw new InvalidDataException("The server returned more synchronization changes than the requested limit.")
+            : page;
     }
 
     /// <summary>
@@ -114,32 +119,32 @@ public sealed partial class WebDavClient
         SyncCollectionParameters? parameters = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         parameters ??= new SyncCollectionParameters();
-        var uri = CreateUri(requestUri);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(parameters.CancellationToken, cancellationToken);
+        Uri uri = CreateUri(requestUri);
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(parameters.CancellationToken, cancellationToken);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(parameters.MaxPages);
         var maxPages = parameters.MaxPages;
         var token = parameters.SyncToken;
         HashSet<string> seen = new(StringComparer.Ordinal);
         if (!string.IsNullOrEmpty(token))
-            seen.Add(token);
+            _ = seen.Add(token);
 
         for (var index = 0; index < maxPages; index++)
         {
             linked.Token.ThrowIfCancellationRequested();
-            var page = await SyncCollectionAsync(uri, parameters.ForPage(token, linked.Token)).ConfigureAwait(false);
+            WebDavSyncResponse page = await SyncCollectionAsync(uri, parameters.ForPage(token, linked.Token)).ConfigureAwait(false);
             if (page.IsTokenInvalid)
                 throw new WebDavSyncTokenInvalidException(page);
             if (page.StatusCode != 207)
             {
-                page.EnsureSuccessStatusCode();
+                _ = page.EnsureSuccessStatusCode();
                 throw new InvalidDataException("A sync report did not return HTTP 207.");
             }
 
             // 只有真正截断时才要求令牌前进；没有变更的最终页可以合法返回与输入相同的令牌。
             // 在产出页面前检查循环，避免调用方把无进展页误当作可持续提交的新检查点。
-            if (page.IsTruncated && !seen.Add(page.SyncToken!))
-                throw new InvalidDataException("The server repeated a synchronization continuation token.");
-            yield return page;
+            yield return page.IsTruncated && !seen.Add(page.SyncToken!)
+                ? throw new InvalidDataException("The server repeated a synchronization continuation token.")
+                : page;
             if (!page.IsTruncated)
                 yield break;
             token = page.SyncToken;
@@ -161,13 +166,13 @@ public sealed partial class WebDavClient
         Dictionary<Uri, WebDavSyncChange> latest = [];
         WebDavSyncResponse? last = null;
         var pageCount = 0;
-        await foreach (var page in EnumerateSyncPagesAsync(requestUri, parameters, cancellationToken).ConfigureAwait(false))
+        await foreach (WebDavSyncResponse? page in EnumerateSyncPagesAsync(requestUri, parameters, cancellationToken).ConfigureAwait(false))
         {
             pageCount++;
             last = page;
             // 各页请求之间服务器仍可继续变化，同一成员可再次出现；最后页面中的状态覆盖先前状态。
             // 删除集合意味着其本地后代应由宿主根据既有目录快照一起移除，不能只依赖本批是否列出后代。
-            foreach (var change in page.Changes)
+            foreach (WebDavSyncChange change in page.Changes)
                 latest[change.ResolvedUri] = change;
         }
         return new WebDavSyncResult(last ?? throw new InvalidDataException("No synchronization page was returned."),

@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>
 /// 保存自动续取结束后的集合变更集合和最终同步令牌。
@@ -50,19 +50,31 @@ public sealed class WebDavSyncResult : WebDavResponse
     }
 
     /// <summary>获取全部分页完成后服务器返回的最终不透明同步令牌。</summary>
-    public string SyncToken { get; }
+    public string SyncToken
+    {
+        get;
+    }
 
     /// <summary>获取最初请求的令牌；null 或空值表示首次完整列举。</summary>
-    public string? RequestedSyncToken { get; }
+    public string? RequestedSyncToken
+    {
+        get;
+    }
 
     /// <summary>获取本次聚合是否从空令牌开始。</summary>
     public bool IsInitialSync => string.IsNullOrEmpty(RequestedSyncToken);
 
     /// <summary>获取实际完成的报告页面数。</summary>
-    public int PageCount { get; }
+    public int PageCount
+    {
+        get;
+    }
 
     /// <summary>获取按成员 URL 合并后保留的最后一次变更。</summary>
-    public IReadOnlyCollection<WebDavSyncChange> Changes { get; }
+    public IReadOnlyCollection<WebDavSyncChange> Changes
+    {
+        get;
+    }
 
     /// <summary>获取新增或发生修改的资源结果。</summary>
     public IReadOnlyCollection<WebDavResource> UpdatedResources => Array.AsReadOnly(Changes

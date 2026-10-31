@@ -24,7 +24,7 @@
 using System.Xml;
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>RFC 5323 标准比较运算；不等于使用 Not(Equal(...)) 表达，避免生成未定义的 ne 元素。</summary>
 public enum WebDavSearchComparison
@@ -57,39 +57,60 @@ public sealed class WebDavSearchLiteral
     }
 
     /// <summary>获取未经 XML 转义的字面值文本，序列化时自动转义。</summary>
-    public string Value { get; }
+    public string Value
+    {
+        get;
+    }
 
     /// <summary>获取完整数据类型名称，null 表示普通字面值。</summary>
-    public XName? DataType { get; }
+    public XName? DataType
+    {
+        get;
+    }
 
     /// <summary>获取可选语言标记，不自动进行区域相关转换。</summary>
-    public string? Language { get; }
+    public string? Language
+    {
+        get;
+    }
 
     /// <summary>创建使用固定 XML 词法格式的整数搜索值。</summary>
     /// <param name="value">要比较的整数。</param>
     /// <returns>类型为 xs:integer 的字面值。</returns>
-    public static WebDavSearchLiteral Integer(long value) => new(XmlConvert.ToString(value), XName.Get("integer", "http://www.w3.org/2001/XMLSchema"));
+    public static WebDavSearchLiteral Integer(long value)
+    {
+        return new(XmlConvert.ToString(value), XName.Get("integer", "http://www.w3.org/2001/XMLSchema"));
+    }
 
     /// <summary>创建不受系统小数分隔符影响的十进制搜索值。</summary>
     /// <param name="value">要比较的十进制值。</param>
     /// <returns>类型为 xs:decimal 的字面值。</returns>
-    public static WebDavSearchLiteral Decimal(decimal value) => new(XmlConvert.ToString(value), XName.Get("decimal", "http://www.w3.org/2001/XMLSchema"));
+    public static WebDavSearchLiteral Decimal(decimal value)
+    {
+        return new(XmlConvert.ToString(value), XName.Get("decimal", "http://www.w3.org/2001/XMLSchema"));
+    }
 
     /// <summary>创建 XML 布尔搜索值。</summary>
     /// <param name="value">要比较的布尔值。</param>
     /// <returns>类型为 xs:boolean 的字面值。</returns>
-    public static WebDavSearchLiteral Boolean(bool value) => new(XmlConvert.ToString(value), XName.Get("boolean", "http://www.w3.org/2001/XMLSchema"));
+    public static WebDavSearchLiteral Boolean(bool value)
+    {
+        return new(XmlConvert.ToString(value), XName.Get("boolean", "http://www.w3.org/2001/XMLSchema"));
+    }
 
     /// <summary>创建保留时区偏移的 ISO 日期时间搜索值。</summary>
     /// <param name="value">要比较的带偏移日期时间。</param>
     /// <returns>类型为 xs:dateTime 的字面值。</returns>
-    public static WebDavSearchLiteral DateTime(DateTimeOffset value) => new(XmlConvert.ToString(value), XName.Get("dateTime", "http://www.w3.org/2001/XMLSchema"));
+    public static WebDavSearchLiteral DateTime(DateTimeOffset value)
+    {
+        return new(XmlConvert.ToString(value), XName.Get("dateTime", "http://www.w3.org/2001/XMLSchema"));
+    }
 
     /// <summary>构造独立字面值元素，局部声明 xsi:type 使用的前缀以避免与调用方命名空间冲突。</summary>
     /// <returns>DAV:literal 或 DAV:typed-literal 元素。</returns>
     public XElement ToXElement()
     {
-        var element = new XElement(WebDavXml.Dav + (DataType is null ? "literal" : "typed-literal"), Value);
+        XElement element = new(WebDavXml.Dav + (DataType is null ? "literal" : "typed-literal"), Value);
         if (DataType is not null)
         {
             XNamespace xsi = "http://www.w3.org/2001/XMLSchema-instance";
@@ -123,17 +144,26 @@ public sealed class WebDavSearchExpression
 
     /// <summary>接管工厂方法刚生成的表达式元素。</summary>
     /// <param name="element">内部独立构建的表达式。</param>
-    private WebDavSearchExpression(XElement element) => _element = element;
+    private WebDavSearchExpression(XElement element)
+    {
+        _element = element;
+    }
 
     /// <summary>合取一个或多个条件，保留各条件的顺序和嵌套结构。</summary>
     /// <param name="conditions">至少一个非 null 条件。</param>
     /// <returns>DAV:and 表达式。</returns>
-    public static WebDavSearchExpression And(params WebDavSearchExpression[] conditions) => Logical("and", conditions);
+    public static WebDavSearchExpression And(params WebDavSearchExpression[] conditions)
+    {
+        return Logical("and", conditions);
+    }
 
     /// <summary>析取一个或多个条件。</summary>
     /// <param name="conditions">至少一个非 null 条件。</param>
     /// <returns>DAV:or 表达式。</returns>
-    public static WebDavSearchExpression Or(params WebDavSearchExpression[] conditions) => Logical("or", conditions);
+    public static WebDavSearchExpression Or(params WebDavSearchExpression[] conditions)
+    {
+        return Logical("or", conditions);
+    }
 
     /// <summary>对单个条件取逻辑反值。</summary>
     /// <param name="condition">要否定的条件。</param>
@@ -154,7 +184,7 @@ public sealed class WebDavSearchExpression
     {
         ArgumentNullException.ThrowIfNull(property);
         ArgumentNullException.ThrowIfNull(literal);
-        var name = comparison switch
+        string name = comparison switch
         {
             WebDavSearchComparison.Equal => "eq",
             WebDavSearchComparison.LessThan => "lt",
@@ -163,7 +193,7 @@ public sealed class WebDavSearchExpression
             WebDavSearchComparison.GreaterThanOrEqual => "gte",
             _ => throw new ArgumentOutOfRangeException(nameof(comparison))
         };
-        var element = new XElement(WebDavXml.Dav + name, Property(property), literal.ToXElement());
+        XElement element = new(WebDavXml.Dav + name, Property(property), literal.ToXElement());
         AddCaseless(element, caseless);
         return new(element);
     }
@@ -177,7 +207,7 @@ public sealed class WebDavSearchExpression
     {
         ArgumentNullException.ThrowIfNull(property);
         ArgumentNullException.ThrowIfNull(pattern);
-        var element = new XElement(WebDavXml.Dav + "like", Property(property), new XElement(WebDavXml.Dav + "literal", pattern));
+        XElement element = new(WebDavXml.Dav + "like", Property(property), new XElement(WebDavXml.Dav + "literal", pattern));
         AddCaseless(element, caseless);
         return new(element);
     }
@@ -193,17 +223,26 @@ public sealed class WebDavSearchExpression
 
     /// <summary>匹配当前资源是集合的情况。</summary>
     /// <returns>无操作数的 DAV:is-collection 表达式。</returns>
-    public static WebDavSearchExpression IsCollection() => new(new XElement(WebDavXml.Dav + "is-collection"));
+    public static WebDavSearchExpression IsCollection()
+    {
+        return new(new XElement(WebDavXml.Dav + "is-collection"));
+    }
 
     /// <summary>匹配指定属性在资源上已定义的情况。</summary>
     /// <param name="property">要检查的完整属性名称。</param>
     /// <returns>DAV:is-defined 表达式。</returns>
-    public static WebDavSearchExpression IsDefined(XName property) => new(new XElement(WebDavXml.Dav + "is-defined", Property(property)));
+    public static WebDavSearchExpression IsDefined(XName property)
+    {
+        return new(new XElement(WebDavXml.Dav + "is-defined", Property(property)));
+    }
 
     /// <summary>匹配属性具有明确语言标记的情况。</summary>
     /// <param name="property">要检查语言信息的完整属性名称。</param>
     /// <returns>DAV:language-defined 表达式。</returns>
-    public static WebDavSearchExpression LanguageDefined(XName property) => new(new XElement(WebDavXml.Dav + "language-defined", Property(property)));
+    public static WebDavSearchExpression LanguageDefined(XName property)
+    {
+        return new(new XElement(WebDavXml.Dav + "language-defined", Property(property)));
+    }
 
     /// <summary>按 RFC 5323 的语言范围匹配属性语言。</summary>
     /// <param name="property">要检查的完整属性名称。</param>
@@ -226,7 +265,10 @@ public sealed class WebDavSearchExpression
 
     /// <summary>返回可独立修改的表达式 XML 副本。</summary>
     /// <returns>完整操作符子树。</returns>
-    public XElement ToXElement() => new(_element);
+    public XElement ToXElement()
+    {
+        return new(_element);
+    }
 
     /// <summary>生成至少含一个操作数的逻辑运算，拒绝空列表和 null 子项。</summary>
     /// <param name="name">内部固定的 and 或 or 名称。</param>
@@ -235,9 +277,9 @@ public sealed class WebDavSearchExpression
     private static WebDavSearchExpression Logical(string name, WebDavSearchExpression[] conditions)
     {
         ArgumentNullException.ThrowIfNull(conditions);
-        if (conditions.Length == 0 || conditions.Any(condition => condition is null))
-            throw new ArgumentException("A logical expression requires at least one non-null operand.", nameof(conditions));
-        return new(new XElement(WebDavXml.Dav + name, conditions.Select(condition => condition.ToXElement())));
+        return conditions.Length == 0 || conditions.Any(condition => condition is null)
+            ? throw new ArgumentException("A logical expression requires at least one non-null operand.", nameof(conditions))
+            : new(new XElement(WebDavXml.Dav + name, conditions.Select(condition => condition.ToXElement())));
     }
 
     /// <summary>把完整属性名包装为协议要求的 DAV:prop 操作数。</summary>

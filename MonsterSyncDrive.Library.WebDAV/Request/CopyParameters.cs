@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>
 /// 配置 COPY 的深度、覆盖策略和目标资源锁条件。
@@ -43,17 +43,26 @@ public class CopyParameters : WebDavRequestOptions
     /// 获取或设置 COPY 的集合复制深度。
     /// </summary>
     /// <value>null 使用 infinity，复制集合及全部后代；ResourceOnly 对应 Depth: 0。</value>
-    public ApplyTo.Copy? ApplyTo { get; set; }
+    public ApplyTo.Copy? ApplyTo
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置目标资源的锁令牌。
     /// </summary>
     /// <value>非 null 时构造绑定绝对目标 URI 的 If 条件；null 表示不提交目标锁。</value>
-    public string? DestLockToken { get; set; }
+    public string? DestLockToken
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置是否允许覆盖已经存在的复制目标。
     /// </summary>
     /// <value>默认 true，发送 Overwrite: T；false 发送 F，由服务器在目标存在时拒绝复制。</value>
-    public bool Overwrite { get; set; }
+    public bool Overwrite
+    {
+        get; set;
+    }
 }

@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>查询模式发现中的一组属性能力说明；缺少能力标记表示未声明，而不是明确不支持。</summary>
 public sealed class WebDavSearchPropertyDescription
@@ -38,9 +38,9 @@ public sealed class WebDavSearchPropertyDescription
         _element = new XElement(element);
         Properties = Array.AsReadOnly((element.Element(WebDavXml.Dav + "prop")?.Elements() ?? []).Select(value => value.Name).ToArray());
         AnyOtherProperty = element.Element(WebDavXml.Dav + "any-other-property") is not null;
-        if ((Properties.Count == 0) == !AnyOtherProperty)
+        if (Properties.Count == 0 == !AnyOtherProperty)
             throw new InvalidDataException("A property description must contain prop or any-other-property, exclusively.");
-        var dataType = element.Element(WebDavXml.Dav + "datatype");
+        XElement? dataType = element.Element(WebDavXml.Dav + "datatype");
         if (dataType is not null && dataType.Elements().Count() != 1)
             throw new InvalidDataException("A search datatype must contain exactly one type element.");
         DeclaredDataType = dataType?.Elements().Single().Name;
@@ -49,36 +49,63 @@ public sealed class WebDavSearchPropertyDescription
         Sortable = Capability("sortable");
         Caseless = Capability("caseless");
 
-        bool? Capability(string name) => element.Element(WebDavXml.Dav + name) is not null ? true : null;
+        bool? Capability(string name)
+        {
+            return element.Element(WebDavXml.Dav + name) is not null ? true : null;
+        }
     }
 
     /// <summary>获取同一 propdesc 中描述的完整属性名称。</summary>
-    public IReadOnlyCollection<XName> Properties { get; }
+    public IReadOnlyCollection<XName> Properties
+    {
+        get;
+    }
 
     /// <summary>获取该描述是否适用于其他条目中未明确列出的属性。</summary>
-    public bool AnyOtherProperty { get; }
+    public bool AnyOtherProperty
+    {
+        get;
+    }
 
     /// <summary>获取服务器显式声明的数据类型；缺失时为 null。</summary>
-    public XName? DeclaredDataType { get; }
+    public XName? DeclaredDataType
+    {
+        get;
+    }
 
     /// <summary>获取有效数据类型，未声明时按规范使用 xs:string。</summary>
     public XName DataType => DeclaredDataType ?? XName.Get("string", "http://www.w3.org/2001/XMLSchema");
 
     /// <summary>获取服务器是否声明属性可用于 where；null 表示未声明。</summary>
-    public bool? Searchable { get; }
+    public bool? Searchable
+    {
+        get;
+    }
 
     /// <summary>获取服务器是否声明属性可在 select 中返回。</summary>
-    public bool? Selectable { get; }
+    public bool? Selectable
+    {
+        get;
+    }
 
     /// <summary>获取服务器是否声明属性可用于排序。</summary>
-    public bool? Sortable { get; }
+    public bool? Sortable
+    {
+        get;
+    }
 
     /// <summary>获取服务器是否声明字符串比较默认不区分大小写。</summary>
-    public bool? Caseless { get; }
+    public bool? Caseless
+    {
+        get;
+    }
 
     /// <summary>返回完整属性描述的副本，包含未知扩展信息。</summary>
     /// <returns>独立的 propdesc 元素。</returns>
-    public XElement ToXElement() => new(_element);
+    public XElement ToXElement()
+    {
+        return new(_element);
+    }
 }
 
 /// <summary>QSD 公布的可选操作符签名；多个同名条目可表达不同操作数组合。</summary>
@@ -92,7 +119,7 @@ public sealed class WebDavSearchOperatorDescription
     internal WebDavSearchOperatorDescription(XElement element)
     {
         _element = new XElement(element);
-        var children = element.Elements().ToArray();
+        XElement[] children = element.Elements().ToArray();
         if (children.Length == 0)
             throw new InvalidDataException("A search operator description has no operator.");
         Name = children[0].Name;
@@ -106,17 +133,29 @@ public sealed class WebDavSearchOperatorDescription
     }
 
     /// <summary>获取完整操作符名称，允许服务器扩展命名空间。</summary>
-    public XName Name { get; }
+    public XName Name
+    {
+        get;
+    }
 
     /// <summary>获取按位置排列的操作数种类，如 DAV:operand-property 和 DAV:operand-typed-literal。</summary>
-    public IReadOnlyCollection<XName> Operands { get; }
+    public IReadOnlyCollection<XName> Operands
+    {
+        get;
+    }
 
     /// <summary>获取操作符是否允许直接字符内容，如 contains。</summary>
-    public bool AllowCharacterData { get; }
+    public bool AllowCharacterData
+    {
+        get;
+    }
 
     /// <summary>返回完整操作符签名副本。</summary>
     /// <returns>独立的 opdesc 元素。</returns>
-    public XElement ToXElement() => new(_element);
+    public XElement ToXElement()
+    {
+        return new(_element);
+    }
 }
 
 /// <summary>一个资源返回的搜索模式，包括成功或失败状态，以及 basicsearch 属性和可选运算能力。</summary>
@@ -134,7 +173,7 @@ public sealed class WebDavSearchSchema
             throw new InvalidDataException("A query schema response has no href.");
         StatusCode = WebDavXml.ReadStatus(response.Element(WebDavXml.Dav + "status"));
         Description = response.Element(WebDavXml.Dav + "responsedescription")?.Value;
-        var container = response.Element(WebDavXml.Dav + "query-schema");
+        XElement? container = response.Element(WebDavXml.Dav + "query-schema");
         if (container is not null && container.Elements().Count() != 1)
             throw new InvalidDataException("query-schema must contain one grammar schema.");
         _schema = container?.Elements().FirstOrDefault() is { } schema ? new XElement(schema) : null;
@@ -142,9 +181,9 @@ public sealed class WebDavSearchSchema
             throw new InvalidDataException("A successful QSD response omitted its query schema.");
         if (_schema?.Name == WebDavXml.Dav + "basicsearchschema")
         {
-            var properties = _schema.Element(WebDavXml.Dav + "properties")
+            XElement properties = _schema.Element(WebDavXml.Dav + "properties")
                 ?? throw new InvalidDataException("basicsearchschema has no properties container.");
-            var operators = _schema.Element(WebDavXml.Dav + "operators")
+            XElement operators = _schema.Element(WebDavXml.Dav + "operators")
                 ?? throw new InvalidDataException("basicsearchschema has no operators container.");
             Properties = Array.AsReadOnly(properties.Elements(WebDavXml.Dav + "propdesc")
                 .Select(value => new WebDavSearchPropertyDescription(value)).ToArray());
@@ -154,13 +193,22 @@ public sealed class WebDavSearchSchema
     }
 
     /// <summary>获取该模式描述对应的资源 URI 引用。</summary>
-    public string? Href { get; }
+    public string? Href
+    {
+        get;
+    }
 
     /// <summary>获取该资源的模式发现 HTTP 状态码。</summary>
-    public int StatusCode { get; }
+    public int StatusCode
+    {
+        get;
+    }
 
     /// <summary>获取服务器提供的可选状态说明。</summary>
-    public string? Description { get; }
+    public string? Description
+    {
+        get;
+    }
 
     /// <summary>获取模式名称，通常为 DAV:basicsearchschema。</summary>
     public XName? SchemaName => _schema?.Name;
@@ -173,7 +221,10 @@ public sealed class WebDavSearchSchema
 
     /// <summary>取得模式 XML 的独立副本；发现失败时可为 null。</summary>
     /// <returns>完整模式子树或 null。</returns>
-    public XElement? ToXElement() => _schema is null ? null : new XElement(_schema);
+    public XElement? ToXElement()
+    {
+        return _schema is null ? null : new XElement(_schema);
+    }
 }
 
 /// <summary>完整搜索模式发现响应，保留每个资源的能力与错误。</summary>
@@ -199,7 +250,10 @@ public sealed class WebDavSearchSchemaResponse : WebDavResponse
     }
 
     /// <summary>获取完整发现文档，保留所有模式的扩展字段。</summary>
-    public XElement? Document { get; }
+    public XElement? Document
+    {
+        get;
+    }
 
     /// <summary>获取每个已返回资源的模式与状态。</summary>
     public IReadOnlyCollection<WebDavSearchSchema> Schemas { get; } = [];

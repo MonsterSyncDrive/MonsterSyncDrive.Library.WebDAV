@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>
 /// 保存 LOCK 返回的活动锁，或集合加锁失败时的多资源状态。
@@ -80,7 +80,10 @@ public class LockResponse : WebDavResponse
     /// 获取成功 LOCK 响应中的活动锁集合。
     /// </summary>
     /// <value>失败状态或集合错误响应中通常为空集合。</value>
-    public IReadOnlyCollection<ActiveLock> ActiveLocks { get; }
+    public IReadOnlyCollection<ActiveLock> ActiveLocks
+    {
+        get;
+    }
 
     /// <summary>
     /// 获取集合 LOCK 的 HTTP 207 中逐资源结果。
@@ -91,12 +94,15 @@ public class LockResponse : WebDavResponse
     /// 获取 HTTP 为 2xx 且所有已返回资源和属性状态均成功的结果。
     /// </summary>
     public override bool IsSuccessful => base.IsSuccessful
-        && Resources.All(resource => (resource.StatusCode is null or >= 200 and < 300)
+        && Resources.All(resource => (resource.StatusCode is null or (>= 200 and < 300))
             && resource.PropertyStatuses.All(status => status.IsSuccessful));
 
     /// <summary>
     /// 返回当前LockResponse的状态或属性概要，便于日志记录和调试。
     /// </summary>
     /// <returns>包含当前对象关键字段的描述字符串，不触发网络请求。</returns>
-    public override string ToString() => $"LOCK response - StatusCode: {StatusCode}, Description: {Description}";
+    public override string ToString()
+    {
+        return $"LOCK response - StatusCode: {StatusCode}, Description: {Description}";
+    }
 }

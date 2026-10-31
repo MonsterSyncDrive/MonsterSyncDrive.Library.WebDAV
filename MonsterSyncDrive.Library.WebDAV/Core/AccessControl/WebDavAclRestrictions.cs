@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core.AccessControl;
+namespace MonsterSyncDrive.Library.WebDAV.Core.AccessControl;
 
 /// <summary>保存服务器对 ACL 的限制及必须存在的主体；未知扩展仍保留在原始 XML 中。</summary>
 public sealed class WebDavAclRestrictions
@@ -47,18 +47,36 @@ public sealed class WebDavAclRestrictions
     }
 
     /// <summary>获取服务器是否实际返回了限制属性。</summary>
-    public bool IsAvailable { get; }
+    public bool IsAvailable
+    {
+        get;
+    }
     /// <summary>获取服务器是否禁止 deny 条目。</summary>
-    public bool GrantOnly { get; }
+    public bool GrantOnly
+    {
+        get;
+    }
     /// <summary>获取服务器是否禁止 invert 反选主体。</summary>
-    public bool NoInvert { get; }
+    public bool NoInvert
+    {
+        get;
+    }
     /// <summary>获取服务器是否要求所有可编辑 deny 排在 grant 前面。</summary>
-    public bool DenyBeforeGrant { get; }
+    public bool DenyBeforeGrant
+    {
+        get;
+    }
     /// <summary>获取 ACL 中必须仍然存在的主体选择器。</summary>
-    public IReadOnlyList<WebDavPrincipal> RequiredPrincipals { get; }
+    public IReadOnlyList<WebDavPrincipal> RequiredPrincipals
+    {
+        get;
+    }
 
     /// <summary>返回完整限制 XML 副本，供调用方识别其他服务器扩展。</summary>
     /// <returns>独立的 DAV:acl-restrictions 元素。</returns>
-    public XElement ToXElement() => new(_element);
+    public XElement ToXElement()
+    {
+        return new(_element);
+    }
 }
 

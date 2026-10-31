@@ -21,12 +21,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV;
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Helpers;
+using MonsterSyncDrive.Library.WebDAV.Request;
+using MonsterSyncDrive.Library.WebDAV.Request.Collections;
+using MonsterSyncDrive.Library.WebDAV.Response;
+using MonsterSyncDrive.Library.WebDAV.Response.Collections;
 using System.Net;
-using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Helpers;
-using MonsterSyncDrive.WebDAV.Request;
-using MonsterSyncDrive.WebDAV.Response;
 
 namespace MonsterSyncDrive.WebDAV;
 
@@ -37,8 +39,10 @@ public sealed partial class WebDavClient
     /// <param name="requestUri">集合的标准 URI 引用。</param>
     /// <param name="parameters">集合类型、初始属性和通用条件。</param>
     /// <returns>保留 mkcol-response、属性状态和资源表示的任务。</returns>
-    public Task<ExtendedMkColResponse> ExtendedMkcolAsync(string requestUri, ExtendedMkColParameters parameters) =>
-        ExtendedMkcolAsync(CreateUri(requestUri), parameters);
+    public Task<ExtendedMkColResponse> ExtendedMkcolAsync(string requestUri, ExtendedMkColParameters parameters)
+    {
+        return ExtendedMkcolAsync(CreateUri(requestUri), parameters);
+    }
 
     /// <summary>原子创建指定资源类型的集合，同时设置初始属性。</summary>
     /// <param name="requestUri">集合的绝对或相对地址。</param>
@@ -47,8 +51,8 @@ public sealed partial class WebDavClient
     public async Task<ExtendedMkColResponse> ExtendedMkcolAsync(Uri requestUri, ExtendedMkColParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        var headers = parameters.LockToken is null ? null : new[] { new KeyValuePair<string, string>("If", IfHeaderHelper.GetHeaderValue(parameters.LockToken)) };
-        var response = await SendDocumentRequestAsync(requestUri, "MKCOL", parameters.CreateBody(), parameters, headers).ConfigureAwait(false);
+        KeyValuePair<string, string>[]? headers = parameters.LockToken is null ? null : new[] { new KeyValuePair<string, string>("If", IfHeaderHelper.GetHeaderValue(parameters.LockToken)) };
+        WebDavDocumentResponse response = await SendDocumentRequestAsync(requestUri, "MKCOL", parameters.CreateBody(), parameters, headers).ConfigureAwait(false);
         return new ExtendedMkColResponse(response);
     }
 
@@ -56,8 +60,10 @@ public sealed partial class WebDavClient
     /// <param name="collectionUri">目标集合 URI 引用。</param>
     /// <param name="options">查询的通用条件和取消令牌；null 使用默认。</param>
     /// <returns>集合及其 Add-Member 端点的发现结果；未返回成功属性时 IsSupported 为 false。</returns>
-    public Task<AddMemberDiscoveryResponse> DiscoverAddMemberAsync(string collectionUri, WebDavRequestOptions? options = null) =>
-        DiscoverAddMemberAsync(CreateUri(collectionUri), options);
+    public Task<AddMemberDiscoveryResponse> DiscoverAddMemberAsync(string collectionUri, WebDavRequestOptions? options = null)
+    {
+        return DiscoverAddMemberAsync(CreateUri(collectionUri), options);
+    }
 
     /// <summary>查询 Add-Member URI 并阻止跨服务器的自动 POST 地址。</summary>
     /// <param name="collectionUri">要发现的集合地址。</param>
@@ -65,24 +71,26 @@ public sealed partial class WebDavClient
     /// <returns>包含已校验端点的能力响应。</returns>
     public async Task<AddMemberDiscoveryResponse> DiscoverAddMemberAsync(Uri collectionUri, WebDavRequestOptions? options = null)
     {
-        var target = ResolveUri(collectionUri);
+        Uri target = ResolveUri(collectionUri);
         options ??= new WebDavRequestOptions();
-        var parameters = new PropfindParameters
+        PropfindParameters parameters = new()
         {
-            ApplyTo = ApplyTo.Propfind.ResourceOnly, RequestType = PropfindRequestType.NamedProperties,
+            ApplyTo = ApplyTo.Propfind.ResourceOnly,
+            RequestType = PropfindRequestType.NamedProperties,
             CustomProperties = [WebDavXml.Dav + "add-member"]
         };
         options.CopyTo(parameters);
-        var response = await Propfind(target, parameters).ConfigureAwait(false);
+        PropfindResponse response = await Propfind(target, parameters).ConfigureAwait(false);
         Uri? endpoint = null;
         if (response.IsSuccessful)
         {
-            if (response.Resources.Count != 1) throw new InvalidDataException("Add-Member discovery must return exactly the requested collection.");
-            var resource = response.Resources.Single();
-            if (!Uri.TryCreate(target, resource.Uri, out var resourceUri)
+            if (response.Resources.Count != 1)
+                throw new InvalidDataException("Add-Member discovery must return exactly the requested collection.");
+            WebDavResource resource = response.Resources.Single();
+            if (!Uri.TryCreate(target, resource.Uri, out Uri? resourceUri)
                 || resourceUri.AbsoluteUri.TrimEnd('/') != target.AbsoluteUri.TrimEnd('/'))
                 throw new InvalidDataException("Add-Member discovery returned a different resource.");
-            var property = resource.Properties.SingleOrDefault(value => value.Name == WebDavXml.Dav + "add-member");
+            WebDavProperty? property = resource.Properties.SingleOrDefault(value => value.Name == WebDavXml.Dav + "add-member");
             if (property is not null)
             {
                 var href = property.ToXElement().Element(WebDavXml.Dav + "href")?.Value;
@@ -92,7 +100,10 @@ public sealed partial class WebDavClient
             }
         }
         return new AddMemberDiscoveryResponse(response.StatusCode, response.Description, target, endpoint, response.Resources)
-        { Headers = response.Headers, Error = response.Error };
+        {
+            Headers = response.Headers,
+            Error = response.Error
+        };
     }
 
     /// <summary>发现服务器的 Add-Member 端点并上传新成员，让服务器选择最终资源 URI。</summary>
@@ -100,8 +111,10 @@ public sealed partial class WebDavClient
     /// <param name="source">从当前位置开始读取的可读源流。</param>
     /// <param name="parameters">上传、Slug 和端点覆盖配置。</param>
     /// <returns>保留 Location 和任意返回表示流的结果，调用方必须释放。</returns>
-    public Task<WebDavWriteResponse> AddMemberAsync(string collectionUri, Stream source, AddMemberParameters? parameters = null) =>
-        AddMemberAsync(CreateUri(collectionUri), source, parameters);
+    public Task<WebDavWriteResponse> AddMemberAsync(string collectionUri, Stream source, AddMemberParameters? parameters = null)
+    {
+        return AddMemberAsync(CreateUri(collectionUri), source, parameters);
+    }
 
     /// <summary>通过同源 Add-Member URI 流式 POST 新成员。</summary>
     /// <param name="collectionUri">目标集合地址。</param>
@@ -111,7 +124,7 @@ public sealed partial class WebDavClient
     public async Task<WebDavWriteResponse> AddMemberAsync(Uri collectionUri, Stream source, AddMemberParameters? parameters = null)
     {
         parameters ??= new AddMemberParameters();
-        using var content = new UploadContent(source, parameters);
+        using UploadContent content = new(source, parameters);
         return await AddMemberAsync(collectionUri, content, parameters).ConfigureAwait(false);
     }
 
@@ -120,8 +133,10 @@ public sealed partial class WebDavClient
     /// <param name="content">由本操作接管的上传正文。</param>
     /// <param name="parameters">内容类型、端点与创建条件。</param>
     /// <returns>包含 Location 及流式返回表示的响应。</returns>
-    public Task<WebDavWriteResponse> AddMemberAsync(string collectionUri, HttpContent content, AddMemberParameters? parameters = null) =>
-        AddMemberAsync(CreateUri(collectionUri), content, parameters);
+    public Task<WebDavWriteResponse> AddMemberAsync(string collectionUri, HttpContent content, AddMemberParameters? parameters = null)
+    {
+        return AddMemberAsync(CreateUri(collectionUri), content, parameters);
+    }
 
     /// <summary>发现或验证上传端点，发送 POST，校验成功创建响应包含服务器分配的位置。</summary>
     /// <param name="collectionUri">集合地址。</param>
@@ -132,38 +147,50 @@ public sealed partial class WebDavClient
     {
         ArgumentNullException.ThrowIfNull(content);
         parameters ??= new AddMemberParameters();
-        var collection = ResolveUri(collectionUri);
+        Uri collection = ResolveUri(collectionUri);
         try
         {
             Uri endpoint;
             if (parameters.AddMemberUri is null)
             {
                 // 创建条件属于即将写入的新成员，不能误用到发现阶段的集合 GET/PROPFIND 上。
-                var discovered = await DiscoverAddMemberAsync(collection, new WebDavRequestOptions
-                { Headers = parameters.Headers, CancellationToken = parameters.CancellationToken }).ConfigureAwait(false);
-                discovered.EnsureSuccessStatusCode();
+                AddMemberDiscoveryResponse discovered = await DiscoverAddMemberAsync(collection, new WebDavRequestOptions
+                {
+                    Headers = parameters.Headers,
+                    CancellationToken = parameters.CancellationToken
+                }).ConfigureAwait(false);
+                _ = discovered.EnsureSuccessStatusCode();
                 endpoint = discovered.AddMemberUri ?? throw new NotSupportedException("The collection does not advertise DAV:add-member.");
             }
-            else endpoint = ValidateAddMemberEndpoint(collection, parameters.AddMemberUri);
-            using var request = CreateRequest(endpoint, "POST", null, content);
+            else
+                endpoint = ValidateAddMemberEndpoint(collection, parameters.AddMemberUri);
+            using HttpRequestMessage request = CreateRequest(endpoint, "POST", null, content);
             content.Headers.ContentType = parameters.ContentType;
             AddLock(request, parameters.LockToken);
             if (parameters.SuggestedName is not null)
                 request.Headers.Add("Slug", Uri.EscapeDataString(parameters.SuggestedName));
             parameters.Apply(request);
-            var response = await SendAsync(request, parameters.CancellationToken).ConfigureAwait(false);
+            HttpResponseMessage response = await SendAsync(request, parameters.CancellationToken).ConfigureAwait(false);
             try
             {
-                var stream = await response.Content.ReadAsStreamAsync(parameters.CancellationToken).ConfigureAwait(false);
-                var result = new WebDavWriteResponse(response, stream, endpoint);
+                Stream stream = await response.Content.ReadAsStreamAsync(parameters.CancellationToken).ConfigureAwait(false);
+                WebDavWriteResponse result = new(response, stream, endpoint);
                 // 成功且同步完成的 RFC 5995 创建必须告诉调用方新资源 URI；202 可继续通过 Location 跟踪异步操作。
-                if (response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.Accepted && result.Location is null)
-                    throw new InvalidDataException("A successful Add-Member response must include Location.");
-                return result;
+                return response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.Accepted && result.Location is null
+                    ? throw new InvalidDataException("A successful Add-Member response must include Location.")
+                    : result;
             }
-            catch { response.Dispose(); throw; }
+            catch
+            {
+                response.Dispose();
+                throw;
+            }
         }
-        catch { content.Dispose(); throw; }
+        catch
+        {
+            content.Dispose();
+            throw;
+        }
     }
 
     /// <summary>解析并校验 Add-Member URI，禁止向另一来源或带嵌入凭据的地址自动上传。</summary>
@@ -172,11 +199,11 @@ public sealed partial class WebDavClient
     /// <returns>通过校验的绝对端点。</returns>
     private Uri ValidateAddMemberEndpoint(Uri collection, Uri endpoint)
     {
-        var absolute = ResolveUri(endpoint.IsAbsoluteUri ? endpoint : new Uri(collection, endpoint));
-        if (!string.Equals(collection.Scheme, absolute.Scheme, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(collection.IdnHost, absolute.IdnHost, StringComparison.OrdinalIgnoreCase) || collection.Port != absolute.Port)
-            throw new InvalidDataException("The Add-Member endpoint must have the same origin as its collection.");
-        return absolute;
+        Uri absolute = ResolveUri(endpoint.IsAbsoluteUri ? endpoint : new Uri(collection, endpoint));
+        return !string.Equals(collection.Scheme, absolute.Scheme, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(collection.IdnHost, absolute.IdnHost, StringComparison.OrdinalIgnoreCase) || collection.Port != absolute.Port
+            ? throw new InvalidDataException("The Add-Member endpoint must have the same origin as its collection.")
+            : absolute;
     }
 }
 

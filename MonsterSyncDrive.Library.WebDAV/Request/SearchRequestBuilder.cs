@@ -21,10 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core;
 using System.Globalization;
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>把类型化搜索参数转换为 RFC 5323 的 select/from/where/orderby/limit XML。</summary>
 internal static class SearchRequestBuilder
@@ -36,15 +37,15 @@ internal static class SearchRequestBuilder
     {
         ArgumentNullException.ThrowIfNull(parameters);
         parameters.AssertParametersAreValid();
-        var root = new XElement(WebDavXml.Dav + "searchrequest", new XAttribute(XNamespace.Xmlns + "D", "DAV:"));
-        foreach (var ns in parameters.Namespaces)
+        XElement root = new(WebDavXml.Dav + "searchrequest", new XAttribute(XNamespace.Xmlns + "D", "DAV:"));
+        foreach (NamespaceAttr ns in parameters.Namespaces)
             root.SetAttributeValue(string.IsNullOrEmpty(ns.Prefix) ? "xmlns" : XNamespace.Xmlns + ns.Prefix, ns.Namespace);
-        var query = new XElement(WebDavXml.Dav + "basicsearch",
+        XElement query = new(WebDavXml.Dav + "basicsearch",
             new XElement(WebDavXml.Dav + "select", parameters.SelectProperties.Count == 0
                 ? new XElement(WebDavXml.Dav + "allprop")
                 : new XElement(WebDavXml.Dav + "prop", parameters.SelectProperties.Select(name => new XElement(name)))),
             BuildFrom(parameters));
-        var filter = parameters.Filter ?? (parameters.MatchAll ? null
+        WebDavSearchExpression? filter = parameters.Filter ?? (parameters.MatchAll ? null
             : WebDavSearchExpression.Like(parameters.SearchProperty!, parameters.SearchKeyword!, parameters.Caseless));
         if (filter is not null)
             query.Add(new XElement(WebDavXml.Dav + "where", filter.ToXElement()));
@@ -64,7 +65,7 @@ internal static class SearchRequestBuilder
     internal static XElement BuildFrom(SearchParameters parameters)
     {
         parameters.AssertScopesAreValid();
-        var scopes = parameters.Scopes.Count > 0 ? parameters.Scopes
+        IReadOnlyCollection<WebDavSearchScope> scopes = parameters.Scopes.Count > 0 ? parameters.Scopes
             : [new WebDavSearchScope(parameters.Scope, parameters.ScopeDepth, parameters.IncludeVersions)];
         return new XElement(WebDavXml.Dav + "from", scopes.Select(scope => scope.ToXElement()));
     }

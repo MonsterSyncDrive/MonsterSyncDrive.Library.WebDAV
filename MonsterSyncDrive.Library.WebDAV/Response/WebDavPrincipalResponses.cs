@@ -21,11 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core.AccessControl;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Core.AccessControl;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>保存 RFC 5397 当前认证主体结果，明确区分未认证与属性查询失败。</summary>
 public sealed class WebDavCurrentPrincipalResponse : WebDavResponse
@@ -36,17 +36,19 @@ public sealed class WebDavCurrentPrincipalResponse : WebDavResponse
     internal WebDavCurrentPrincipalResponse(WebDavDocumentResponse response, Uri requestUri)
         : base(response.StatusCode, response.Description)
     {
-        Headers = response.Headers; Error = response.Error;
+        Headers = response.Headers;
+        Error = response.Error;
         Resource = response.Resources.Count == 1 ? response.Resources.Single() : null;
-        var property = Resource?.Properties.FirstOrDefault(value => value.Name == WebDavXml.Dav + "current-user-principal")?.ToXElement();
-        if (property is null) return;
-        var values = property.Elements().ToArray();
+        XElement? property = Resource?.Properties.FirstOrDefault(value => value.Name == WebDavXml.Dav + "current-user-principal")?.ToXElement();
+        if (property is null)
+            return;
+        XElement[] values = property.Elements().ToArray();
         if (values.Length != 1 || (values[0].Name != WebDavXml.Dav + "href" && values[0].Name != WebDavXml.Dav + "unauthenticated"))
             throw new InvalidDataException("current-user-principal requires exactly one href or unauthenticated selector.");
         Principal = WebDavPrincipal.Parse(values[0]);
         if (Principal.Kind == WebDavPrincipalKind.Href)
         {
-            if (!Uri.TryCreate(requestUri, Principal.Href, out var resolved)
+            if (!Uri.TryCreate(requestUri, Principal.Href, out Uri? resolved)
                 || (resolved.Scheme != Uri.UriSchemeHttp && resolved.Scheme != Uri.UriSchemeHttps)
                 || !string.IsNullOrEmpty(resolved.UserInfo) || !string.IsNullOrEmpty(resolved.Fragment))
                 throw new InvalidDataException("Current principal URL must resolve to an HTTP(S) URI without credentials or fragment.");
@@ -55,18 +57,27 @@ public sealed class WebDavCurrentPrincipalResponse : WebDavResponse
     }
 
     /// <summary>获取原始资源及逐属性状态，便于区分禁止读取和属性不存在。</summary>
-    public WebDavResource? Resource { get; }
+    public WebDavResource? Resource
+    {
+        get;
+    }
     /// <summary>获取 href 或 unauthenticated 主体；查询失败或属性缺失时为 null。</summary>
-    public WebDavPrincipal? Principal { get; }
+    public WebDavPrincipal? Principal
+    {
+        get;
+    }
     /// <summary>获取已经解析为绝对 HTTP(S) 的主体 URI；未认证或缺失时为 null。</summary>
-    public Uri? PrincipalUri { get; }
+    public Uri? PrincipalUri
+    {
+        get;
+    }
     /// <summary>获取是否已确认当前用户已经认证；未知结果为 false，应结合 IsSuccessful 判断。</summary>
     public bool IsAuthenticated => PrincipalUri is not null;
     /// <summary>获取是否已确认当前用户尚未认证；缺失或读取失败时为 false。</summary>
     public bool IsUnauthenticated => Principal?.Kind == WebDavPrincipalKind.Unauthenticated;
     /// <summary>获取 HTTP、资源状态及所需属性是否均成功。</summary>
     public override bool IsSuccessful => base.IsSuccessful && Principal is not null && Resource is not null
-        && Resource.StatusCode is null or >= 200 and < 300;
+        && Resource.StatusCode is null or (>= 200 and < 300);
 }
 
 /// <summary>保存主体属性查询或主体报告结果，保留组成员与逐资源错误。</summary>
@@ -77,12 +88,17 @@ public sealed class WebDavPrincipalResponse : WebDavDocumentResponse
     internal WebDavPrincipalResponse(WebDavDocumentResponse response)
         : base(response.StatusCode, response.Description, response.Document)
     {
-        Headers = response.Headers; Error = response.Error; Representation = response.Representation;
+        Headers = response.Headers;
+        Error = response.Error;
+        Representation = response.Representation;
         Principals = Array.AsReadOnly(Resources.Select(resource => new WebDavPrincipalInfo(resource)).ToArray());
     }
 
     /// <summary>获取结果主体快照，包含用户及组的直接成员和直接所属组。</summary>
-    public IReadOnlyList<WebDavPrincipalInfo> Principals { get; }
+    public IReadOnlyList<WebDavPrincipalInfo> Principals
+    {
+        get;
+    }
 }
 
 /// <summary>保存服务器声明的可搜索主体属性及人类可读说明。</summary>
@@ -92,21 +108,30 @@ public sealed class WebDavPrincipalSearchProperty
     /// <param name="element">完整声明节点。</param>
     internal WebDavPrincipalSearchProperty(XElement element)
     {
-        var properties = element.Element(WebDavXml.Dav + "prop")?.Elements().ToArray();
+        XElement[]? properties = element.Element(WebDavXml.Dav + "prop")?.Elements().ToArray();
         if (element.Name != WebDavXml.Dav + "principal-search-property" || properties is not { Length: 1 })
             throw new InvalidDataException("A principal search property must name exactly one property.");
         Name = properties[0].Name;
-        var description = element.Element(WebDavXml.Dav + "description");
+        XElement? description = element.Element(WebDavXml.Dav + "description");
         Description = description?.Value;
         Language = (string?)description?.Attribute(XNamespace.Xml + "lang");
     }
 
     /// <summary>获取可用于 property-search 的完整属性名称。</summary>
-    public XName Name { get; }
+    public XName Name
+    {
+        get;
+    }
     /// <summary>获取属性用途说明。</summary>
-    public string? Description { get; }
+    public string? Description
+    {
+        get;
+    }
     /// <summary>获取说明的语言标记。</summary>
-    public string? Language { get; }
+    public string? Language
+    {
+        get;
+    }
 }
 
 /// <summary>保存 principal-search-property-set 报告的 200 XML 响应。</summary>
@@ -117,7 +142,9 @@ public sealed class WebDavPrincipalSearchPropertySetResponse : WebDavDocumentRes
     internal WebDavPrincipalSearchPropertySetResponse(WebDavDocumentResponse response)
         : base(response.StatusCode, response.Description, response.Document)
     {
-        Headers = response.Headers; Error = response.Error; Representation = response.Representation;
+        Headers = response.Headers;
+        Error = response.Error;
+        Representation = response.Representation;
         if (response.IsSuccessful && response.Document?.Name != WebDavXml.Dav + "principal-search-property-set")
             throw new InvalidDataException("Expected DAV:principal-search-property-set report response.");
         Properties = Array.AsReadOnly(response.Document?.Name == WebDavXml.Dav + "principal-search-property-set"
@@ -126,6 +153,9 @@ public sealed class WebDavPrincipalSearchPropertySetResponse : WebDavDocumentRes
     }
 
     /// <summary>获取服务器支持查询的主体属性与说明。</summary>
-    public IReadOnlyList<WebDavPrincipalSearchProperty> Properties { get; }
+    public IReadOnlyList<WebDavPrincipalSearchProperty> Properties
+    {
+        get;
+    }
 }
 

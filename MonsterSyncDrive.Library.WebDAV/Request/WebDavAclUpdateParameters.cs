@@ -21,16 +21,19 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Helpers;
+using MonsterSyncDrive.Library.WebDAV.Helpers;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>配置 ACL 读改写操作的并发保护及通用 HTTP 条件。</summary>
 /// <remarks>RFC 3744 建议读取及更新 ACL 前先加锁。服务器不支持锁时，可显式关闭自动加锁，并由调用方安排外部同步。</remarks>
 public sealed class WebDavAclUpdateParameters : WebDavRequestOptions
 {
     /// <summary>获取或设置调用方已经持有的资源锁令牌；指定后不获取也不释放该锁。</summary>
-    public string? LockToken { get; set; }
+    public string? LockToken
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置没有现有令牌时是否自动获取独占写锁，默认 true。</summary>
     public bool AcquireLock { get; set; } = true;
@@ -41,7 +44,8 @@ public sealed class WebDavAclUpdateParameters : WebDavRequestOptions
     /// <summary>校验显式令牌和锁租约，避免在读取 ACL 后才发现本地参数错误。</summary>
     internal void Validate()
     {
-        if (LockToken is not null) _ = IfHeaderHelper.Normalize(LockToken);
+        if (LockToken is not null)
+            _ = IfHeaderHelper.Normalize(LockToken);
         if (AcquireLock && LockToken is null && LockTimeout != Timeout.InfiniteTimeSpan && LockTimeout <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(LockTimeout));
     }

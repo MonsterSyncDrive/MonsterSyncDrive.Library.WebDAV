@@ -21,11 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Request;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Request;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>
 /// 表示一次 RFC 6578 集合报告的完整页面及已经分类的成员变更。
@@ -33,8 +33,6 @@ namespace MonsterSyncDrive.WebDAV.Response;
 /// <remarks>资源级 404 是正常删除；request-URI 上的 507 是续取标志，不作为文件失败。RFC 8144 最小响应允许无属性的直接 200 变更，其他失败和不可遍历集合明确保留。</remarks>
 public sealed class WebDavSyncResponse : WebDavReportResponse
 {
-    /// <summary>根级错误是否声明输入同步令牌已经失效。</summary>
-    private readonly bool _isTokenInvalid;
 
     /// <summary>
     /// 解析已经完整读取的报告，并检查同步令牌、成员唯一性及分页语义。
@@ -52,9 +50,9 @@ public sealed class WebDavSyncResponse : WebDavReportResponse
         Error = report.Error;
         Representation = report.Representation;
         RequestedSyncToken = requestedSyncToken;
-        var root = report.Document;
-        var errorElement = root?.Name == WebDavXml.Dav + "error" ? root : root?.Element(WebDavXml.Dav + "error");
-        _isTokenInvalid = errorElement?.Elements(WebDavXml.Dav + "valid-sync-token").Any() == true;
+        XElement? root = report.Document;
+        XElement? errorElement = root?.Name == WebDavXml.Dav + "error" ? root : root?.Element(WebDavXml.Dav + "error");
+        IsTokenInvalid = errorElement?.Elements(WebDavXml.Dav + "valid-sync-token").Any() == true;
 
         // 对失败响应保留状态和错误详情，不要求服务器还返回成功页面中的同步令牌。
         // 特别是失效令牌的 403 不会自动触发空令牌重试，避免调用方意外替换已有快照。
@@ -65,29 +63,35 @@ public sealed class WebDavSyncResponse : WebDavReportResponse
         }
         if (StatusCode != 207 || root?.Name != WebDavXml.Dav + "multistatus")
             throw new InvalidDataException("A successful sync-collection report must return DAV:multistatus with HTTP 207.");
-        var tokenElements = root.Elements(WebDavXml.Dav + "sync-token").ToArray();
+        XElement[] tokenElements = root.Elements(WebDavXml.Dav + "sync-token").ToArray();
         if (tokenElements.Length != 1 || tokenElements[0].HasElements)
             throw new InvalidDataException("A sync-collection response must contain exactly one scalar sync-token.");
-        try { SyncCollectionParameters.ValidateToken(tokenElements[0].Value, allowEmpty: false); }
-        catch (ArgumentException exception) { throw new InvalidDataException("The server returned an invalid synchronization token.", exception); }
+        try
+        {
+            SyncCollectionParameters.ValidateToken(tokenElements[0].Value, allowEmpty: false);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidDataException("The server returned an invalid synchronization token.", exception);
+        }
 
-        var elements = root.Elements(WebDavXml.Dav + "response").ToArray();
+        XElement[] elements = root.Elements(WebDavXml.Dav + "response").ToArray();
         if (elements.Length != Resources.Count)
             throw new InvalidDataException("The sync response resource projection is incomplete.");
-        var resources = Resources.ToArray();
+        WebDavResource[] resources = Resources.ToArray();
         HashSet<Uri> seen = [];
         List<WebDavSyncChange> changes = [];
-        for (var index = 0; index < elements.Length; index++)
+        for (int index = 0; index < elements.Length; index++)
         {
-            var element = elements[index];
+            XElement element = elements[index];
             if (element.Elements(WebDavXml.Dav + "href").Count() != 1)
                 throw new InvalidDataException("A sync member must contain exactly one href.");
-            var resource = resources[index];
-            var resolved = ResolveMemberUri(collectionUri, resource.Uri);
+            WebDavResource resource = resources[index];
+            Uri resolved = ResolveMemberUri(collectionUri, resource.Uri);
             if (!seen.Add(resolved))
                 throw new InvalidDataException("A member URI appeared more than once in one sync response.");
-            var directStatuses = element.Elements(WebDavXml.Dav + "status").ToArray();
-            var propstats = element.Elements(WebDavXml.Dav + "propstat").ToArray();
+            XElement[] directStatuses = element.Elements(WebDavXml.Dav + "status").ToArray();
+            XElement[] propstats = element.Elements(WebDavXml.Dav + "propstat").ToArray();
             if (directStatuses.Length > 1 || (directStatuses.Length > 0 && propstats.Length > 0))
                 throw new InvalidDataException("A sync member cannot combine resource status and property status.");
 
@@ -140,13 +144,19 @@ public sealed class WebDavSyncResponse : WebDavReportResponse
     }
 
     /// <summary>获取本次请求提交的原始同步令牌；首次列举时为 null 或空。</summary>
-    public string? RequestedSyncToken { get; }
+    public string? RequestedSyncToken
+    {
+        get;
+    }
 
     /// <summary>获取本次请求是否使用空令牌开始首次完整列举。</summary>
     public bool IsInitialSync => string.IsNullOrEmpty(RequestedSyncToken);
 
     /// <summary>获取本页成员变更，不包括集合自身的 507 续取标记。</summary>
-    public IReadOnlyCollection<WebDavSyncChange> Changes { get; }
+    public IReadOnlyCollection<WebDavSyncChange> Changes
+    {
+        get;
+    }
 
     /// <summary>获取新增或修改的成员；报告本身不区分新增和修改。</summary>
     public IReadOnlyCollection<WebDavResource> UpdatedResources => Array.AsReadOnly(Changes
@@ -165,13 +175,22 @@ public sealed class WebDavSyncResponse : WebDavReportResponse
         .Select(change => change.Resource).ToArray());
 
     /// <summary>获取服务器是否截断了本页结果，需要用本页 SyncToken 继续请求。</summary>
-    public bool IsTruncated { get; }
+    public bool IsTruncated
+    {
+        get;
+    }
 
     /// <summary>获取请求集合自身的 507 续取条目；未截断时为 null。</summary>
-    public WebDavResource? TruncationResource { get; }
+    public WebDavResource? TruncationResource
+    {
+        get;
+    }
 
     /// <summary>获取服务器是否通过 DAV:valid-sync-token 明确拒绝输入令牌。</summary>
-    public bool IsTokenInvalid => _isTokenInvalid;
+    public bool IsTokenInvalid
+    {
+        get;
+    }
 
     /// <summary>获取本页是否在协议上成功且没有未处理成员失败；正常删除与截断标志不计作失败。</summary>
     public override bool IsSuccessful => StatusCode == 207 && !IsTokenInvalid && Changes.All(change => !change.IsFailure);
@@ -184,10 +203,10 @@ public sealed class WebDavSyncResponse : WebDavReportResponse
     /// <returns>标准 URI 规则解析后的绝对成员地址。</returns>
     private static Uri ResolveMemberUri(Uri collectionUri, string? href)
     {
-        if (string.IsNullOrWhiteSpace(href) || !Uri.TryCreate(collectionUri, href, out var resolved)
-            || resolved.Fragment.Length != 0 || resolved.Scheme is not ("http" or "https"))
-            throw new InvalidDataException("The sync response contains an invalid member href.");
-        return resolved;
+        return string.IsNullOrWhiteSpace(href) || !Uri.TryCreate(collectionUri, href, out Uri? resolved)
+            || resolved.Fragment.Length != 0 || resolved.Scheme is not ("http" or "https")
+            ? throw new InvalidDataException("The sync response contains an invalid member href.")
+            : resolved;
     }
 
     /// <summary>
@@ -196,10 +215,12 @@ public sealed class WebDavSyncResponse : WebDavReportResponse
     /// <param name="collectionUri">请求的集合地址。</param>
     /// <param name="candidate">已解析的结果地址。</param>
     /// <returns>地址与查询一致且路径仅有末尾斜杠差异时为 true。</returns>
-    private static bool SameCollection(Uri collectionUri, Uri candidate) =>
-        collectionUri.GetLeftPart(UriPartial.Authority).Equals(candidate.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase)
+    private static bool SameCollection(Uri collectionUri, Uri candidate)
+    {
+        return collectionUri.GetLeftPart(UriPartial.Authority).Equals(candidate.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase)
         && collectionUri.Query == candidate.Query
         && collectionUri.AbsolutePath.TrimEnd('/') == candidate.AbsolutePath.TrimEnd('/');
+    }
 
     /// <summary>
     /// 校验成员 URI 没有越出报告的来源、集合路径及请求层级。
@@ -209,11 +230,11 @@ public sealed class WebDavSyncResponse : WebDavReportResponse
     /// <param name="level">直接成员或全部后代范围。</param>
     private static void ValidateScope(Uri collectionUri, Uri candidate, WebDavSyncLevel level)
     {
-        var rootPath = collectionUri.AbsolutePath.TrimEnd('/') + "/";
+        string rootPath = collectionUri.AbsolutePath.TrimEnd('/') + "/";
         if (!collectionUri.GetLeftPart(UriPartial.Authority).Equals(candidate.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase)
             || !candidate.AbsolutePath.StartsWith(rootPath, StringComparison.Ordinal))
             throw new InvalidDataException("The sync response contains a member outside the requested collection.");
-        var remainder = candidate.AbsolutePath[rootPath.Length..].TrimEnd('/');
+        string remainder = candidate.AbsolutePath[rootPath.Length..].TrimEnd('/');
         if (remainder.Length == 0 || (level == WebDavSyncLevel.Children && remainder.Contains('/')))
             throw new InvalidDataException("The sync member is outside the requested synchronization level.");
     }

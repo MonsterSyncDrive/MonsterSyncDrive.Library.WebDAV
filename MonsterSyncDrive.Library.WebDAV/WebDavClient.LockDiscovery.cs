@@ -21,9 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Request;
-using MonsterSyncDrive.WebDAV.Response;
+using MonsterSyncDrive.Library.WebDAV;
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Request;
+using MonsterSyncDrive.Library.WebDAV.Response;
 
 namespace MonsterSyncDrive.WebDAV;
 
@@ -38,18 +39,18 @@ public sealed partial class WebDavClient
     public async Task<LockDiscoveryResponse> GetLockDiscoveryAsync(string requestUri, WebDavRequestOptions? options = null)
     {
         options ??= new WebDavRequestOptions();
-        var parameters = new PropfindParameters
+        PropfindParameters parameters = new()
         {
             ApplyTo = ApplyTo.Propfind.ResourceOnly,
             RequestType = PropfindRequestType.NamedProperties,
             CustomProperties = [WebDavXml.Dav + "lockdiscovery", WebDavXml.Dav + "supportedlock"]
         };
         options.CopyTo(parameters);
-        var response = await Propfind(requestUri, parameters).ConfigureAwait(false);
+        PropfindResponse response = await Propfind(requestUri, parameters).ConfigureAwait(false);
         // 多个资源或成功空集合意味着服务器没有遵守单资源查询语义，不能据此误判资源“无锁”。
-        if (response.IsSuccessful && response.Resources.Count != 1 || response.Resources.Count > 1)
-            throw new InvalidDataException("A Depth:0 lock discovery must identify one resource.");
-        return new LockDiscoveryResponse(response);
+        return (response.IsSuccessful && response.Resources.Count != 1) || response.Resources.Count > 1
+            ? throw new InvalidDataException("A Depth:0 lock discovery must identify one resource.")
+            : new LockDiscoveryResponse(response);
     }
 }
 

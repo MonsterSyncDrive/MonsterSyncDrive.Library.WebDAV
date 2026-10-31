@@ -21,12 +21,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core;
 using System.Globalization;
 using System.Numerics;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>搜索命中及本次查询上下文中的全文相关性分数。</summary>
 public sealed class WebDavSearchHit
@@ -41,11 +41,17 @@ public sealed class WebDavSearchHit
     }
 
     /// <summary>获取命中的资源快照，错误范围条目也保留在此。</summary>
-    public WebDavResource Resource { get; }
+    public WebDavResource Resource
+    {
+        get;
+    }
 
     /// <summary>获取服务器返回的相关性分数；未提供时为 null。</summary>
     /// <remarks>不同服务器或不同查询的分数不能直接比较。</remarks>
-    public int? Score { get; }
+    public int? Score
+    {
+        get;
+    }
 }
 
 /// <summary>完整 basicsearch 响应，保留评分、截断提示与根级扩展。</summary>
@@ -59,7 +65,7 @@ public sealed class WebDavSearchResponse : WebDavResponse
         Headers = response.Headers;
         Error = response.Error;
         Document = response.Document is null ? null : new XElement(response.Document);
-        if (response.StatusCode is >= 200 and < 300 && response.StatusCode != 207)
+        if (response.StatusCode is >= 200 and < 300 and not 207)
             throw new InvalidDataException("SEARCH requires HTTP 207.");
         if (response.StatusCode == 207)
         {
@@ -67,11 +73,11 @@ public sealed class WebDavSearchResponse : WebDavResponse
                 throw new InvalidDataException("SEARCH response is not DAV:multistatus.");
             Hits = Array.AsReadOnly(Document.Elements(WebDavXml.Dav + "response").Zip(response.Resources, (element, resource) =>
             {
-                var scoreElement = element.Element(WebDavXml.Dav + "score");
+                XElement? scoreElement = element.Element(WebDavXml.Dav + "score");
                 int? score = null;
                 if (scoreElement is not null)
                 {
-                    if (!int.TryParse(scoreElement.Value.AsSpan().Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) || parsed is < 0 or > 10000)
+                    if (!int.TryParse(scoreElement.Value.AsSpan().Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int parsed) || parsed is < 0 or > 10000)
                         throw new InvalidDataException("Search score must be an integer from 0 through 10000.");
                     score = parsed;
                 }
@@ -80,21 +86,27 @@ public sealed class WebDavSearchResponse : WebDavResponse
             // RFC 5323 用仲裁资源自己的 507 状态表示截断，并没有要求额外的 error 子元素。
             // 只把仲裁资源的 507 解释成截断；其他资源的普通失败仍原样保留，避免误报查询完整性。
             IsTruncated = Hits.Any(hit => hit.Resource.StatusCode == 507
-                && Uri.TryCreate(searchArbiter, hit.Resource.Uri, out var resourceUri) && resourceUri == searchArbiter);
+                && Uri.TryCreate(searchArbiter, hit.Resource.Uri, out Uri? resourceUri) && resourceUri == searchArbiter);
         }
     }
 
     /// <summary>获取完整响应 XML，可读取查询扩展及未知元数据。</summary>
-    public XElement? Document { get; }
+    public XElement? Document
+    {
+        get;
+    }
 
     /// <summary>获取包含资源和可选评分的全部结果。</summary>
     public IReadOnlyCollection<WebDavSearchHit> Hits { get; } = [];
 
     /// <summary>获取服务器是否明确声明结果因数量限制被截断。</summary>
-    public bool IsTruncated { get; }
+    public bool IsTruncated
+    {
+        get;
+    }
 
     /// <summary>获取 HTTP 与资源级状态是否均成功；截断范围的 507 会保留为失败结果。</summary>
-    public override bool IsSuccessful => base.IsSuccessful && Hits.All(hit => hit.Resource.StatusCode is null or >= 200 and < 300);
+    public override bool IsSuccessful => base.IsSuccessful && Hits.All(hit => hit.Resource.StatusCode is null or (>= 200 and < 300));
 }
 
 /// <summary>RFC 5323 公布的 XML 查询语法名称及属性查询状态。</summary>
@@ -110,11 +122,11 @@ public sealed class WebDavSearchGrammarResponse : WebDavResponse
             return;
         if (response.Resources.Count != 1)
             throw new InvalidDataException("Grammar discovery must return exactly one resource.");
-        var resource = response.Resources.Single();
+        WebDavResource resource = response.Resources.Single();
         ResourceStatusCode = resource.StatusCode;
-        var name = WebDavXml.Dav + "supported-query-grammar-set";
+        XName name = WebDavXml.Dav + "supported-query-grammar-set";
         PropertyStatusCode = resource.PropertyStatuses.FirstOrDefault(status => status.Name == name)?.StatusCode;
-        var property = resource.Properties.SingleOrDefault(value => value.Name == name);
+        WebDavProperty? property = resource.Properties.SingleOrDefault(value => value.Name == name);
         if (property is null)
             return;
         Grammars = Array.AsReadOnly(property.ToXElement().Elements(WebDavXml.Dav + "supported-query-grammar")
@@ -129,23 +141,27 @@ public sealed class WebDavSearchGrammarResponse : WebDavResponse
     /// <returns>该查询语法的完整名称。</returns>
     private static XName ParseGrammar(XElement element)
     {
-        var names = element.Elements().ToArray();
-        if (names.Length != 1)
-            throw new InvalidDataException("A DAV:grammar must contain exactly one grammar name.");
-        return names[0].Name;
+        XElement[] names = element.Elements().ToArray();
+        return names.Length != 1 ? throw new InvalidDataException("A DAV:grammar must contain exactly one grammar name.") : names[0].Name;
     }
 
     /// <summary>获取服务器公布的完整语法元素名称。</summary>
     public IReadOnlyCollection<XName> Grammars { get; } = [];
 
     /// <summary>获取资源级状态，未返回时为 null。</summary>
-    public int? ResourceStatusCode { get; }
+    public int? ResourceStatusCode
+    {
+        get;
+    }
 
     /// <summary>获取语法属性的状态，如 404 表示服务器未提供。</summary>
-    public int? PropertyStatusCode { get; }
+    public int? PropertyStatusCode
+    {
+        get;
+    }
 
     /// <summary>获取 HTTP 和资源级状态是否成功；属性未提供不被误当成已支持任何语法。</summary>
-    public override bool IsSuccessful => base.IsSuccessful && ResourceStatusCode is null or >= 200 and < 300;
+    public override bool IsSuccessful => base.IsSuccessful && ResourceStatusCode is null or (>= 200 and < 300);
 }
 
 /// <summary>RFC 4331 配额快照，保留未知额度与合法零值的区别。</summary>
@@ -171,31 +187,49 @@ public sealed class WebDavQuotaResponse : WebDavResponse
         // 只接受成功属性中的非负整数。404/403 留在状态中，不能把未知额度或禁止访问误报成零。
         BigInteger? Read(string localName)
         {
-            var property = Resource.Properties.SingleOrDefault(value => value.Name == WebDavXml.Dav + localName);
-            if (property is null)
-                return null;
-            if (!BigInteger.TryParse(property.TextValue.AsSpan().Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var value) || value.Sign < 0)
-                throw new InvalidDataException("A successful DAV quota property must be a non-negative integer.");
-            return value;
+            WebDavProperty? property = Resource.Properties.SingleOrDefault(value => value.Name == WebDavXml.Dav + localName);
+            return property is null
+                ? null
+                : !BigInteger.TryParse(property.TextValue.AsSpan().Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out BigInteger value) || value.Sign < 0
+                ? throw new InvalidDataException("A successful DAV quota property must be a non-negative integer.")
+                : (BigInteger?)value;
         }
-        int? Status(string localName) => Resource.PropertyStatuses.FirstOrDefault(value => value.Name == WebDavXml.Dav + localName)?.StatusCode;
+        int? Status(string localName)
+        {
+            return Resource.PropertyStatuses.FirstOrDefault(value => value.Name == WebDavXml.Dav + localName)?.StatusCode;
+        }
     }
 
     /// <summary>获取服务器报告已计入配额的字节数，未知时为 null。</summary>
-    public BigInteger? UsedBytes { get; }
+    public BigInteger? UsedBytes
+    {
+        get;
+    }
 
     /// <summary>获取服务器报告还可分配的字节数，0 表示已满，null 表示未提供或无权读取。</summary>
-    public BigInteger? AvailableBytes { get; }
+    public BigInteger? AvailableBytes
+    {
+        get;
+    }
 
     /// <summary>获取已用配额属性的状态码，缺少属性状态时为 null。</summary>
-    public int? UsedStatusCode { get; }
+    public int? UsedStatusCode
+    {
+        get;
+    }
 
     /// <summary>获取可用额度属性的状态码，404 不被推断为明确无限额度。</summary>
-    public int? AvailableStatusCode { get; }
+    public int? AvailableStatusCode
+    {
+        get;
+    }
 
     /// <summary>获取查询资源和全部属性状态，便于区分不支持、权限拒绝及资源错误。</summary>
-    public WebDavResource? Resource { get; }
+    public WebDavResource? Resource
+    {
+        get;
+    }
 
     /// <summary>获取 HTTP 和资源状态是否成功；属性是否可用由对应状态及可空数值判断。</summary>
-    public override bool IsSuccessful => base.IsSuccessful && Resource?.StatusCode is null or >= 200 and < 300;
+    public override bool IsSuccessful => base.IsSuccessful && Resource?.StatusCode is null or (>= 200 and < 300);
 }

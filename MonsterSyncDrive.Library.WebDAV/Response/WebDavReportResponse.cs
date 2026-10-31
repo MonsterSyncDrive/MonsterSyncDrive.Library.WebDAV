@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>
 /// 保存通用 XML REPORT 的完整根元素及可选多状态资源，兼容原有 PropfindResponse 使用方式。
@@ -56,7 +56,10 @@ public class WebDavReportResponse : PropfindResponse
     public string? SyncToken => _document?.Element(WebDavXml.Dav + "sync-token")?.Value;
 
     /// <summary>获取需要保留的原始非 XML 错误正文或 Prefer 返回表示字节；普通 XML 报告通常为 null。</summary>
-    public byte[]? Representation { get; internal set; }
+    public byte[]? Representation
+    {
+        get; internal set;
+    }
 
     /// <summary>获取根级除 DAV:response 之外的全部元素副本，包括同步令牌和未知扩展内容。</summary>
     public IReadOnlyCollection<XElement> RootExtensions => _document is null ? []
@@ -68,9 +71,11 @@ public class WebDavReportResponse : PropfindResponse
     /// </summary>
     /// <param name="document">可选完整根元素。</param>
     /// <returns>多状态资源或空集合。</returns>
-    private static IEnumerable<WebDavResource> ParseResources(XElement? document) =>
-        document?.Name == WebDavXml.Dav + "multistatus"
+    private static IEnumerable<WebDavResource> ParseResources(XElement? document)
+    {
+        return document?.Name == WebDavXml.Dav + "multistatus"
             ? document.Elements(WebDavXml.Dav + "response").Select(WebDavXml.ParseResource).ToArray()
             : [];
+    }
 }
 

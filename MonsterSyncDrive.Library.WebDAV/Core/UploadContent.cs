@@ -21,11 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Request;
 using System.Buffers;
 using System.Net;
-using MonsterSyncDrive.WebDAV.Request;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 将调用方的可读流转换为 PUT 正文，管理长度、进度及源流所有权。
@@ -84,7 +84,11 @@ internal sealed class UploadContent : HttpContent
     /// </summary>
     /// <param name="length">输出缓存的剩余字节数；长度未知时输出 0，但返回值为 false。</param>
     /// <returns>已知长度时为 true，否则为 false，由 HTTP 层选择分块等未知长度传输方式。</returns>
-    protected override bool TryComputeLength(out long length) { length = _length ?? 0; return _length.HasValue; }
+    protected override bool TryComputeLength(out long length)
+    {
+        length = _length ?? 0;
+        return _length.HasValue;
+    }
     /// <summary>
     /// 从源流当前位置或记录的起点流式写入 HTTP 请求正文，并报告累计发送进度。
     /// </summary>
@@ -92,8 +96,10 @@ internal sealed class UploadContent : HttpContent
     /// <param name="stream">HTTP 处理器提供的目标网络流，由调用方管理，当前方法不关闭。</param>
     /// <param name="context">框架传入的传输上下文；本实现不使用其额外信息。</param>
     /// <returns>表示本次正文复制完成的任务；进度重新从零累计。</returns>
-    protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
-        SerializeToStreamAsync(stream, context, _options.CancellationToken);
+    protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+    {
+        return SerializeToStreamAsync(stream, context, _options.CancellationToken);
+    }
 
     /// <summary>
     /// 从源流当前位置或记录的起点流式写入 HTTP 请求正文，并报告累计发送进度。
@@ -111,7 +117,7 @@ internal sealed class UploadContent : HttpContent
         else if (Interlocked.Exchange(ref _serialized, 1) != 0)
             throw new InvalidOperationException("A non-seekable upload stream cannot be sent more than once.");
         // 每次序列化借用一个固定缓冲区，不按文件长度分配内存；不可定位流也可逐块传输。
-        var buffer = ArrayPool<byte>.Shared.Rent(81920);
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(81920);
         try
         {
             long total = 0;
@@ -124,7 +130,10 @@ internal sealed class UploadContent : HttpContent
                 _options.Progress?.Report(total);
             }
         }
-        finally { ArrayPool<byte>.Shared.Return(buffer); } // 取消、源读取错误和目标写入错误都必须归还缓冲区。
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        } // 取消、源读取错误和目标写入错误都必须归还缓冲区。
     }
 
     /// <summary>
@@ -138,6 +147,9 @@ internal sealed class UploadContent : HttpContent
             if (disposing && Interlocked.Exchange(ref _disposed, 1) == 0 && !_options.LeaveOpen)
                 _source.Dispose();
         }
-        finally { base.Dispose(disposing); }
+        finally
+        {
+            base.Dispose(disposing);
+        }
     }
 }

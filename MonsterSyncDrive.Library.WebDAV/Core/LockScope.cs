@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 指定写锁采用共享模式还是独占模式。

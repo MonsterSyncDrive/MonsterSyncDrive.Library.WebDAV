@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 描述 DAV:lockdiscovery 返回的一项活动写锁。
@@ -43,40 +43,61 @@ public class ActiveLock
     /// 获取锁的覆盖深度；0 仅当前资源，infinity 包含集合全部后代。
     /// </summary>
     /// <value>null 表示响应未提供或未能识别深度。</value>
-    public ApplyTo.Lock? ApplyTo { get; private set; }
+    public ApplyTo.Lock? ApplyTo
+    {
+        get; private set;
+    }
 
     /// <summary>
     /// 获取服务器报告的共享或独占锁模式。
     /// </summary>
     /// <value>null 表示未提供或无法识别。</value>
-    public LockScope? LockScope { get; private set; }
+    public LockScope? LockScope
+    {
+        get; private set;
+    }
 
     /// <summary>
     /// 获取用于续期、修改条件及解锁的锁令牌 URI。
     /// </summary>
     /// <value>保存 DAV:locktoken/DAV:href 的内容，不含 HTTP 头外层尖括号；缺失时为 null。</value>
-    public string? LockToken { get; private set; }
+    public string? LockToken
+    {
+        get; private set;
+    }
 
     /// <summary>
     /// 获取锁所有者说明，可以是普通文本或绝对 URI。
     /// </summary>
     /// <value>null 表示未返回所有者；该信息不能替代身份认证。</value>
-    public LockOwner? Owner { get; private set; }
+    public LockOwner? Owner
+    {
+        get; private set;
+    }
 
     /// <summary>
     /// 获取 DAV:lockroot/DAV:href 标识的锁根资源。
     /// </summary>
     /// <value>保留服务器提供的 URI 形式，缺失时为 null。</value>
-    public string? LockRoot { get; private set; }
+    public string? LockRoot
+    {
+        get; private set;
+    }
 
     /// <summary>
     /// 获取服务器报告的锁剩余租约。
     /// </summary>
     /// <value>有限租约使用 TimeSpan；Infinite 使用 Timeout.InfiniteTimeSpan，缺失或无法识别时为 null。</value>
-    public TimeSpan? Timeout { get; private set; }
+    public TimeSpan? Timeout
+    {
+        get; private set;
+    }
 
     /// <summary>获取服务器报告的完整锁类型名称，例如 DAV:write。</summary>
-    public XName? LockType { get; private set; }
+    public XName? LockType
+    {
+        get; private set;
+    }
 
     /// <summary>
     /// 收集活动锁属性并构造活动锁快照。
@@ -121,7 +142,11 @@ public class ActiveLock
         /// <summary>设置服务器报告的锁类型。</summary>
         /// <param name="lockType">完整 XML 类型名称，未提供时可为 null。</param>
         /// <returns>当前构建器。</returns>
-        public Builder WithLockType(XName? lockType) { _lockType = lockType; return this; }
+        public Builder WithLockType(XName? lockType)
+        {
+            _lockType = lockType;
+            return this;
+        }
 
         /// <summary>
         /// 设置活动锁覆盖的资源深度。
@@ -194,15 +219,18 @@ public class ActiveLock
         /// </summary>
         /// <remarks>保留所有未设置的可选值为 null；不验证租约或重新查询服务器。</remarks>
         /// <returns>包含当前构建值的新快照实例。</returns>
-        public ActiveLock Build() => new()
+        public ActiveLock Build()
         {
-            ApplyTo = _applyTo,
-            LockScope = _lockScope,
-            LockToken = _lockToken,
-            Owner = _owner,
-            LockRoot = _lockRoot,
-            Timeout = _timeout,
-            LockType = _lockType
-        };
+            return new()
+            {
+                ApplyTo = _applyTo,
+                LockScope = _lockScope,
+                LockToken = _lockToken,
+                Owner = _owner,
+                LockRoot = _lockRoot,
+                Timeout = _timeout,
+                LockType = _lockType
+            };
+        }
     }
 }

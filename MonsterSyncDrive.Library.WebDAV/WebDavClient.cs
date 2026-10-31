@@ -21,6 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV;
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Helpers;
+using MonsterSyncDrive.Library.WebDAV.Request;
+using MonsterSyncDrive.Library.WebDAV.Response;
 using System.Buffers;
 using System.Globalization;
 using System.Net;
@@ -28,10 +33,6 @@ using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Helpers;
-using MonsterSyncDrive.WebDAV.Request;
-using MonsterSyncDrive.WebDAV.Response;
 
 namespace MonsterSyncDrive.WebDAV;
 
@@ -73,7 +74,7 @@ public sealed partial class WebDavClient : IWebDavClient
             ValidateAbsoluteUri(parameters.BaseAddress);
         // Range 的偏移与长度针对原始文件字节。关闭自动解压，避免响应头仍描述压缩前后不同的字节区间。
         // 自动重定向由配置显式开启；通用重定向可能改变 DAV 方法，不能默认代替协议层的地址处理。
-        var handler = new HttpClientHandler
+        HttpClientHandler handler = new()
         {
             AutomaticDecompression = DecompressionMethods.None,
             AllowAutoRedirect = parameters.AllowAutoRedirect,
@@ -89,13 +90,21 @@ public sealed partial class WebDavClient : IWebDavClient
         }
         // HttpClient 在 ResponseHeadersRead 模式下只等待响应头，自己的超时不能覆盖之后的流式读取。
         // 内部关闭这层计时，统一由调度器创建的关联令牌控制请求头、正文传输以及调用方读取等待。
-        var client = new HttpClient(handler) { BaseAddress = parameters.BaseAddress, Timeout = Timeout.InfiniteTimeSpan };
+        HttpClient client = new(handler)
+        {
+            BaseAddress = parameters.BaseAddress,
+            Timeout = Timeout.InfiniteTimeSpan
+        };
         try
         {
-            foreach (var header in parameters.DefaultRequestHeaders)
+            foreach (KeyValuePair<string, string> header in parameters.DefaultRequestHeaders)
                 client.DefaultRequestHeaders.Add(header.Key, header.Value);
         }
-        catch { client.Dispose(); throw; }
+        catch
+        {
+            client.Dispose();
+            throw;
+        }
         _dispatcher = new WebDavDispatcher(client, true, parameters.Timeout ?? TimeSpan.FromSeconds(100));
         _maxXmlCharacters = parameters.MaxXmlCharacters;
     }
@@ -154,7 +163,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<PropfindResponse> Propfind(string requestUri) => Propfind(CreateUri(requestUri));
+    public Task<PropfindResponse> Propfind(string requestUri)
+    {
+        return Propfind(CreateUri(requestUri));
+    }
+
     /// <summary>
     /// 异步查询资源的 DAV 属性，完整读取多状态文档后返回资源快照。
     /// </summary>
@@ -164,7 +177,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<PropfindResponse> Propfind(Uri requestUri) => Propfind(requestUri, new PropfindParameters());
+    public Task<PropfindResponse> Propfind(Uri requestUri)
+    {
+        return Propfind(requestUri, new PropfindParameters());
+    }
+
     /// <summary>
     /// 异步查询资源的 DAV 属性，完整读取多状态文档后返回资源快照。
     /// </summary>
@@ -175,7 +192,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<PropfindResponse> Propfind(string requestUri, PropfindParameters parameters) => Propfind(CreateUri(requestUri), parameters);
+    public Task<PropfindResponse> Propfind(string requestUri, PropfindParameters parameters)
+    {
+        return Propfind(CreateUri(requestUri), parameters);
+    }
+
     /// <summary>
     /// 异步查询资源的 DAV 属性，完整读取多状态文档后返回资源快照。
     /// </summary>
@@ -188,7 +209,7 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
     public async Task<PropfindResponse> Propfind(Uri requestUri, PropfindParameters parameters)
     {
-        using var request = CreatePropfind(requestUri, parameters);
+        using HttpRequestMessage request = CreatePropfind(requestUri, parameters);
         return await SendPropertyRequestAsync(request, parameters.CancellationToken).ConfigureAwait(false);
     }
 
@@ -207,13 +228,13 @@ public sealed partial class WebDavClient : IWebDavClient
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         parameters ??= new PropfindParameters();
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(parameters.CancellationToken, cancellationToken);
-        using var request = CreatePropfind(CreateUri(requestUri), parameters);
-        using var response = await SendAsync(request, linked.Token).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(parameters.CancellationToken, cancellationToken);
+        using HttpRequestMessage request = CreatePropfind(CreateUri(requestUri), parameters);
+        using HttpResponseMessage response = await SendAsync(request, linked.Token).ConfigureAwait(false);
+        _ = response.EnsureSuccessStatusCode();
         if ((int)response.StatusCode != 207)
             throw new InvalidDataException("PROPFIND did not return HTTP 207.");
-        await foreach (var element in WebDavXml.ReadResponsesAsync(response, _maxXmlCharacters, linked.Token).ConfigureAwait(false))
+        await foreach (XElement? element in WebDavXml.ReadResponsesAsync(response, _maxXmlCharacters, linked.Token).ConfigureAwait(false))
             yield return WebDavXml.ParseResource(element);
     }
 
@@ -227,16 +248,20 @@ public sealed partial class WebDavClient : IWebDavClient
     {
         ArgumentNullException.ThrowIfNull(parameters);
         // 无正文是协议定义的隐式 allprop，不能用一个不完整的 propfind 元素代替。
-        var content = parameters.RequestType == PropfindRequestType.AllPropertiesImplied ? null
+        HttpContent? content = parameters.RequestType == PropfindRequestType.AllPropertiesImplied ? null
             : XmlContent(PropfindRequestBuilder.BuildRequest(parameters.RequestType, parameters.CustomProperties, parameters.Namespaces), parameters.ContentType);
-        var request = CreateRequest(uri, "PROPFIND", null, content);
+        HttpRequestMessage request = CreateRequest(uri, "PROPFIND", null, content);
         try
         {
             request.Headers.Add("Depth", DepthHeaderHelper.GetValueForPropfind(parameters.ApplyTo ?? ApplyTo.Propfind.ResourceAndChildren));
             parameters.Apply(request);
             return request;
         }
-        catch { request.Dispose(); throw; }
+        catch
+        {
+            request.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -249,7 +274,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<ProppatchResponse> Proppatch(string requestUri, ProppatchParameters parameters) => Proppatch(CreateUri(requestUri), parameters);
+    public Task<ProppatchResponse> Proppatch(string requestUri, ProppatchParameters parameters)
+    {
+        return Proppatch(CreateUri(requestUri), parameters);
+    }
+
     /// <summary>
     /// 异步设置或删除资源属性，并检查服务器是否确认全部请求属性。
     /// </summary>
@@ -265,18 +294,18 @@ public sealed partial class WebDavClient : IWebDavClient
         ArgumentNullException.ThrowIfNull(parameters);
         if (parameters.PropertiesToSet.Count == 0 && parameters.XmlPropertiesToSet.Count == 0 && parameters.PropertiesToRemove.Count == 0)
             throw new ArgumentException("At least one property update is required.", nameof(parameters));
-        var root = ProppatchRequestBuilder.BuildRequest(parameters.PropertiesToSet, parameters.PropertiesToRemove, parameters.Namespaces);
+        XElement root = ProppatchRequestBuilder.BuildRequest(parameters.PropertiesToSet, parameters.PropertiesToRemove, parameters.Namespaces);
         // 标量值已在构建器中按文本转义；结构化值复制完整元素，保留元素属性与混合内容。
         // 两种表示保持明确，普通字符串中的尖括号不会被当成 XML 执行或展开。
         if (parameters.XmlPropertiesToSet.Count > 0)
             root.Add(new XElement(WebDavXml.Dav + "set", new XElement(WebDavXml.Dav + "prop", parameters.XmlPropertiesToSet.Select(value => new XElement(value)))));
-        using var request = CreateRequest(requestUri, "PROPPATCH", null, XmlContent(root, parameters.ContentType));
+        using HttpRequestMessage request = CreateRequest(requestUri, "PROPPATCH", null, XmlContent(root, parameters.ContentType));
         AddLock(request, parameters.LockToken);
         parameters.Apply(request);
         var minimal = GetRequestPreferences(request).Return == WebDavReturnPreference.Minimal;
-        using var response = await SendAsync(request, parameters.CancellationToken).ConfigureAwait(false);
-        var document = await ReadDocumentResponseAsync(response, parameters.CancellationToken).ConfigureAwait(false);
-        var resources = document.Resources;
+        using HttpResponseMessage response = await SendAsync(request, parameters.CancellationToken).ConfigureAwait(false);
+        WebDavDocumentResponse document = await ReadDocumentResponseAsync(response, parameters.CancellationToken).ConfigureAwait(false);
+        IReadOnlyCollection<WebDavResource> resources = document.Resources;
         if (response.IsSuccessStatusCode && (int)response.StatusCode != 207
             && !(minimal && response.StatusCode is HttpStatusCode.OK or HttpStatusCode.NoContent))
             throw new InvalidDataException("Expected HTTP 207, or a successful minimal PROPPATCH response.");
@@ -285,15 +314,17 @@ public sealed partial class WebDavClient : IWebDavClient
             // HTTP 207 只表示存在逐项结果，不表示每个修改已成功。
             // 对成功资源要求设置、结构化设置及删除涉及的每个属性都得到确认；漏报不能算成功。
             // 资源本身明确失败时保留失败状态，由响应模型的 IsSuccessful 统一报告。
-            var expected = parameters.PropertiesToSet.Keys.Concat(parameters.XmlPropertiesToSet.Select(value => value.Name))
+            HashSet<XName> expected = parameters.PropertiesToSet.Keys.Concat(parameters.XmlPropertiesToSet.Select(value => value.Name))
                 .Concat(parameters.PropertiesToRemove).ToHashSet();
-            if (resources.Count == 0 || resources.Any(resource => (resource.StatusCode is null or >= 200 and < 300)
+            if (resources.Count == 0 || resources.Any(resource => (resource.StatusCode is null or (>= 200 and < 300))
                 && !expected.IsSubsetOf(resource.PropertyStatuses.Select(status => status.Name))))
                 throw new InvalidDataException("PROPPATCH did not acknowledge all requested properties.");
         }
         return new ProppatchResponse((int)response.StatusCode, response.ReasonPhrase, resources.SelectMany(resource => resource.PropertyStatuses))
         {
-            Resources = resources, Error = document.Error, Document = document.Document,
+            Resources = resources,
+            Error = document.Error,
+            Document = document.Document,
             Representation = document.Representation
         }.CaptureHeaders<ProppatchResponse>(response);
     }
@@ -306,7 +337,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步创建任务；结果包含 HTTP 状态及可能的多状态资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Mkcol(string requestUri) => Mkcol(CreateUri(requestUri));
+    public Task<WebDavResponse> Mkcol(string requestUri)
+    {
+        return Mkcol(CreateUri(requestUri));
+    }
+
     /// <summary>
     /// 异步在指定 URI 创建 WebDAV 集合。
     /// </summary>
@@ -315,7 +350,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步创建任务；结果包含 HTTP 状态及可能的多状态资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Mkcol(Uri requestUri) => Mkcol(requestUri, new MkColParameters());
+    public Task<WebDavResponse> Mkcol(Uri requestUri)
+    {
+        return Mkcol(requestUri, new MkColParameters());
+    }
+
     /// <summary>
     /// 异步在指定 URI 创建 WebDAV 集合。
     /// </summary>
@@ -325,7 +364,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步创建任务；结果包含 HTTP 状态及可能的多状态资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Mkcol(string requestUri, MkColParameters parameters) => Mkcol(CreateUri(requestUri), parameters);
+    public Task<WebDavResponse> Mkcol(string requestUri, MkColParameters parameters)
+    {
+        return Mkcol(CreateUri(requestUri), parameters);
+    }
+
     /// <summary>
     /// 异步在指定 URI 创建 WebDAV 集合。
     /// </summary>
@@ -338,7 +381,7 @@ public sealed partial class WebDavClient : IWebDavClient
     public async Task<WebDavResponse> Mkcol(Uri requestUri, MkColParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        using var request = CreateRequest(requestUri, "MKCOL");
+        using HttpRequestMessage request = CreateRequest(requestUri, "MKCOL");
         AddLock(request, parameters.LockToken);
         parameters.Apply(request);
         return await SendMutationAsync(request, parameters.CancellationToken).ConfigureAwait(false);
@@ -352,7 +395,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步删除任务；HTTP 207 时结果为 WebDavMultiStatusResponse，内部失败可通过 IsSuccessful 发现。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Delete(string requestUri) => Delete(CreateUri(requestUri));
+    public Task<WebDavResponse> Delete(string requestUri)
+    {
+        return Delete(CreateUri(requestUri));
+    }
+
     /// <summary>
     /// 异步删除文件或集合，保留集合内部资源的删除失败结果。
     /// </summary>
@@ -361,7 +408,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步删除任务；HTTP 207 时结果为 WebDavMultiStatusResponse，内部失败可通过 IsSuccessful 发现。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Delete(Uri requestUri) => Delete(requestUri, new DeleteParameters());
+    public Task<WebDavResponse> Delete(Uri requestUri)
+    {
+        return Delete(requestUri, new DeleteParameters());
+    }
+
     /// <summary>
     /// 异步删除文件或集合，保留集合内部资源的删除失败结果。
     /// </summary>
@@ -371,7 +422,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步删除任务；HTTP 207 时结果为 WebDavMultiStatusResponse，内部失败可通过 IsSuccessful 发现。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Delete(string requestUri, DeleteParameters parameters) => Delete(CreateUri(requestUri), parameters);
+    public Task<WebDavResponse> Delete(string requestUri, DeleteParameters parameters)
+    {
+        return Delete(CreateUri(requestUri), parameters);
+    }
+
     /// <summary>
     /// 异步删除文件或集合，保留集合内部资源的删除失败结果。
     /// </summary>
@@ -384,7 +439,7 @@ public sealed partial class WebDavClient : IWebDavClient
     public async Task<WebDavResponse> Delete(Uri requestUri, DeleteParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        using var request = CreateRequest(requestUri, "DELETE");
+        using HttpRequestMessage request = CreateRequest(requestUri, "DELETE");
         AddLock(request, parameters.LockToken);
         parameters.Apply(request);
         return await SendMutationAsync(request, parameters.CancellationToken).ConfigureAwait(false);
@@ -399,7 +454,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetRawFile(string requestUri) => GetRawFile(CreateUri(requestUri));
+    public Task<WebDavStreamResponse> GetRawFile(string requestUri)
+    {
+        return GetRawFile(CreateUri(requestUri));
+    }
+
     /// <summary>
     /// 异步打开原始文件正文流，支持单段字节范围与 HTTP 版本条件。
     /// </summary>
@@ -409,7 +468,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetRawFile(Uri requestUri) => GetRawFile(requestUri, new GetFileParameters());
+    public Task<WebDavStreamResponse> GetRawFile(Uri requestUri)
+    {
+        return GetRawFile(requestUri, new GetFileParameters());
+    }
+
     /// <summary>
     /// 异步打开原始文件正文流，支持单段字节范围与 HTTP 版本条件。
     /// </summary>
@@ -420,7 +483,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetRawFile(string requestUri, GetFileParameters parameters) => GetRawFile(CreateUri(requestUri), parameters);
+    public Task<WebDavStreamResponse> GetRawFile(string requestUri, GetFileParameters parameters)
+    {
+        return GetRawFile(CreateUri(requestUri), parameters);
+    }
+
     /// <summary>
     /// 异步打开原始文件正文流，支持单段字节范围与 HTTP 版本条件。
     /// </summary>
@@ -431,7 +498,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetRawFile(Uri requestUri, GetFileParameters parameters) => GetFile(requestUri, false, parameters);
+    public Task<WebDavStreamResponse> GetRawFile(Uri requestUri, GetFileParameters parameters)
+    {
+        return GetFile(requestUri, false, parameters);
+    }
+
     /// <summary>
     /// 异步请求可由服务器处理后的文件正文，并保留流式响应。
     /// </summary>
@@ -441,7 +512,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetProcessedFile(string requestUri) => GetProcessedFile(CreateUri(requestUri));
+    public Task<WebDavStreamResponse> GetProcessedFile(string requestUri)
+    {
+        return GetProcessedFile(CreateUri(requestUri));
+    }
+
     /// <summary>
     /// 异步请求可由服务器处理后的文件正文，并保留流式响应。
     /// </summary>
@@ -451,7 +526,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetProcessedFile(Uri requestUri) => GetProcessedFile(requestUri, new GetFileParameters());
+    public Task<WebDavStreamResponse> GetProcessedFile(Uri requestUri)
+    {
+        return GetProcessedFile(requestUri, new GetFileParameters());
+    }
+
     /// <summary>
     /// 异步请求可由服务器处理后的文件正文，并保留流式响应。
     /// </summary>
@@ -462,7 +541,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetProcessedFile(string requestUri, GetFileParameters parameters) => GetProcessedFile(CreateUri(requestUri), parameters);
+    public Task<WebDavStreamResponse> GetProcessedFile(string requestUri, GetFileParameters parameters)
+    {
+        return GetProcessedFile(CreateUri(requestUri), parameters);
+    }
+
     /// <summary>
     /// 异步请求可由服务器处理后的文件正文，并保留流式响应。
     /// </summary>
@@ -473,7 +556,10 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetProcessedFile(Uri requestUri, GetFileParameters parameters) => GetFile(requestUri, true, parameters);
+    public Task<WebDavStreamResponse> GetProcessedFile(Uri requestUri, GetFileParameters parameters)
+    {
+        return GetFile(requestUri, true, parameters);
+    }
 
     /// <summary>
     /// 将已经校验的 GET 响应转换为接管其所有权的流式下载结果。
@@ -485,21 +571,27 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>包含正文流和响应快照的异步结果。</returns>
     private async Task<WebDavStreamResponse> GetFile(Uri requestUri, bool translate, GetFileParameters parameters)
     {
-        var response = await GetFileResponse(requestUri, translate, parameters).ConfigureAwait(false);
+        HttpResponseMessage response = await GetFileResponse(requestUri, translate, parameters).ConfigureAwait(false);
         try
         {
             if (!response.IsSuccessStatusCode)
             {
                 // 文件正文保持流式；失败正文通常很小，先有界保存便可同时提供 DAV:error 和仍可读取的错误原文。
-                var document = await ReadDocumentResponseAsync(response, parameters.CancellationToken, true).ConfigureAwait(false);
+                WebDavDocumentResponse document = await ReadDocumentResponseAsync(response, parameters.CancellationToken, true).ConfigureAwait(false);
                 return new WebDavStreamResponse(response, new MemoryStream(document.Representation ?? [], writable: false))
-                { Error = document.Error };
+                {
+                    Error = document.Error
+                };
             }
             // 打开正文流也可能失败或取消。只有成功构造结果后才移交响应所有权，异常路径必须关闭响应。
-            var stream = await response.Content.ReadAsStreamAsync(parameters.CancellationToken).ConfigureAwait(false);
+            Stream stream = await response.Content.ReadAsStreamAsync(parameters.CancellationToken).ConfigureAwait(false);
             return new WebDavStreamResponse(response, stream);
         }
-        catch { response.Dispose(); throw; }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -516,14 +608,14 @@ public sealed partial class WebDavClient : IWebDavClient
     public async Task<HttpResponseMessage> GetFileResponse(Uri requestUri, bool translate, GetFileParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        using var request = CreateRequest(requestUri, "GET");
+        using HttpRequestMessage request = CreateRequest(requestUri, "GET");
         request.Headers.Add("Translate", translate ? "t" : "f");
         // 明确要求不压缩的字节，保证 Range、Content-Length 与调用方看到的内容处于同一字节空间。
         request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("identity"));
         request.Headers.Range = parameters.Range;
         request.Headers.IfRange = parameters.IfRange;
         parameters.Apply(request);
-        var response = await SendAsync(request, parameters.CancellationToken).ConfigureAwait(false);
+        HttpResponseMessage response = await SendAsync(request, parameters.CancellationToken).ConfigureAwait(false);
         try
         {
             if (!translate && response.Content.Headers.ContentEncoding.Any(value => !value.Equals("identity", StringComparison.OrdinalIgnoreCase)))
@@ -531,7 +623,11 @@ public sealed partial class WebDavClient : IWebDavClient
             ValidateRange(request, response);
             return response;
         }
-        catch { response.Dispose(); throw; }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -553,8 +649,8 @@ public sealed partial class WebDavClient : IWebDavClient
         if (!destination.CanWrite)
             throw new ArgumentException("Download destination must be writable.", nameof(destination));
         parameters ??= new GetFileParameters();
-        using var response = await GetRawFile(requestUri, parameters).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        using WebDavStreamResponse response = await GetRawFile(requestUri, parameters).ConfigureAwait(false);
+        _ = response.EnsureSuccessStatusCode();
         var buffer = ArrayPool<byte>.Shared.Rent(81920);
         try
         {
@@ -571,7 +667,10 @@ public sealed partial class WebDavClient : IWebDavClient
                 throw new IOException("Downloaded content length differs from Content-Length.");
             return response;
         }
-        finally { ArrayPool<byte>.Shared.Return(buffer); }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     /// <summary>
@@ -583,7 +682,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(string requestUri, Stream stream) => PutFile(CreateUri(requestUri), stream);
+    public Task<WebDavResponse> PutFile(string requestUri, Stream stream)
+    {
+        return PutFile(CreateUri(requestUri), stream);
+    }
+
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
     /// </summary>
@@ -593,7 +696,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(Uri requestUri, Stream stream) => PutFile(requestUri, stream, new PutFileParameters());
+    public Task<WebDavResponse> PutFile(Uri requestUri, Stream stream)
+    {
+        return PutFile(requestUri, stream, new PutFileParameters());
+    }
+
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
     /// </summary>
@@ -604,7 +711,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(string requestUri, Stream stream, string contentType) => PutFile(CreateUri(requestUri), stream, contentType);
+    public Task<WebDavResponse> PutFile(string requestUri, Stream stream, string contentType)
+    {
+        return PutFile(CreateUri(requestUri), stream, contentType);
+    }
+
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
     /// </summary>
@@ -615,8 +726,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(Uri requestUri, Stream stream, string contentType) =>
-        PutFile(requestUri, stream, new PutFileParameters { ContentType = MediaTypeHeaderValue.Parse(contentType) });
+    public Task<WebDavResponse> PutFile(Uri requestUri, Stream stream, string contentType)
+    {
+        return PutFile(requestUri, stream, new PutFileParameters { ContentType = MediaTypeHeaderValue.Parse(contentType) });
+    }
+
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
     /// </summary>
@@ -627,7 +741,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(string requestUri, Stream stream, PutFileParameters parameters) => PutFile(CreateUri(requestUri), stream, parameters);
+    public Task<WebDavResponse> PutFile(string requestUri, Stream stream, PutFileParameters parameters)
+    {
+        return PutFile(CreateUri(requestUri), stream, parameters);
+    }
+
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
     /// </summary>
@@ -642,7 +760,7 @@ public sealed partial class WebDavClient : IWebDavClient
     {
         ArgumentNullException.ThrowIfNull(parameters);
         // UploadContent 记录初始位置，并把正文释放和源流所有权分开：默认释放正文但保留调用方的流。
-        using var content = new UploadContent(stream, parameters);
+        using UploadContent content = new(stream, parameters);
         return await PutFile(requestUri, content, parameters).ConfigureAwait(false);
     }
     /// <summary>
@@ -654,7 +772,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(string requestUri, HttpContent content) => PutFile(CreateUri(requestUri), content);
+    public Task<WebDavResponse> PutFile(string requestUri, HttpContent content)
+    {
+        return PutFile(CreateUri(requestUri), content);
+    }
+
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
     /// </summary>
@@ -664,7 +786,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(Uri requestUri, HttpContent content) => PutFile(requestUri, content, new PutFileParameters());
+    public Task<WebDavResponse> PutFile(Uri requestUri, HttpContent content)
+    {
+        return PutFile(requestUri, content, new PutFileParameters());
+    }
+
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
     /// </summary>
@@ -675,7 +801,10 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(string requestUri, HttpContent content, PutFileParameters parameters) => PutFile(CreateUri(requestUri), content, parameters);
+    public Task<WebDavResponse> PutFile(string requestUri, HttpContent content, PutFileParameters parameters)
+    {
+        return PutFile(CreateUri(requestUri), content, parameters);
+    }
 
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
@@ -691,7 +820,7 @@ public sealed partial class WebDavClient : IWebDavClient
     {
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(parameters);
-        using var request = CreateRequest(requestUri, "PUT", null, content);
+        using HttpRequestMessage request = CreateRequest(requestUri, "PUT", null, content);
         content.Headers.ContentType = parameters.ContentType;
         AddLock(request, parameters.LockToken);
         parameters.Apply(request);
@@ -707,7 +836,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步复制任务；多状态响应保留已返回的资源和属性错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Copy(string sourceUri, string destUri) => Copy(CreateUri(sourceUri), CreateUri(destUri));
+    public Task<WebDavResponse> Copy(string sourceUri, string destUri)
+    {
+        return Copy(CreateUri(sourceUri), CreateUri(destUri));
+    }
+
     /// <summary>
     /// 异步复制源资源到目标 URI，支持集合深度、覆盖策略及目标锁条件。
     /// </summary>
@@ -717,7 +850,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步复制任务；多状态响应保留已返回的资源和属性错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Copy(Uri sourceUri, Uri destUri) => Copy(sourceUri, destUri, new CopyParameters());
+    public Task<WebDavResponse> Copy(Uri sourceUri, Uri destUri)
+    {
+        return Copy(sourceUri, destUri, new CopyParameters());
+    }
+
     /// <summary>
     /// 异步复制源资源到目标 URI，支持集合深度、覆盖策略及目标锁条件。
     /// </summary>
@@ -728,7 +865,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步复制任务；多状态响应保留已返回的资源和属性错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Copy(string sourceUri, string destUri, CopyParameters parameters) => Copy(CreateUri(sourceUri), CreateUri(destUri), parameters);
+    public Task<WebDavResponse> Copy(string sourceUri, string destUri, CopyParameters parameters)
+    {
+        return Copy(CreateUri(sourceUri), CreateUri(destUri), parameters);
+    }
+
     /// <summary>
     /// 异步复制源资源到目标 URI，支持集合深度、覆盖策略及目标锁条件。
     /// </summary>
@@ -742,8 +883,8 @@ public sealed partial class WebDavClient : IWebDavClient
     public async Task<WebDavResponse> Copy(Uri sourceUri, Uri destUri, CopyParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        using var request = CreateRequest(sourceUri, "COPY");
-        var destination = ResolveUri(destUri);
+        using HttpRequestMessage request = CreateRequest(sourceUri, "COPY");
+        Uri destination = ResolveUri(destUri);
         request.Headers.Add("Destination", destination.AbsoluteUri);
         request.Headers.Add("Depth", DepthHeaderHelper.GetValueForCopy(parameters.ApplyTo ?? ApplyTo.Copy.ResourceAndAncestors));
         request.Headers.Add("Overwrite", parameters.Overwrite ? "T" : "F");
@@ -763,7 +904,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步移动任务；多状态内部错误会使 IsSuccessful 为 false，不能仅依据 HTTP 207 判断成功。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Move(string sourceUri, string destUri) => Move(CreateUri(sourceUri), CreateUri(destUri));
+    public Task<WebDavResponse> Move(string sourceUri, string destUri)
+    {
+        return Move(CreateUri(sourceUri), CreateUri(destUri));
+    }
+
     /// <summary>
     /// 异步移动源资源到目标 URI，按各自 URI 提交源锁与目标锁。
     /// </summary>
@@ -773,7 +918,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步移动任务；多状态内部错误会使 IsSuccessful 为 false，不能仅依据 HTTP 207 判断成功。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Move(Uri sourceUri, Uri destUri) => Move(sourceUri, destUri, new MoveParameters());
+    public Task<WebDavResponse> Move(Uri sourceUri, Uri destUri)
+    {
+        return Move(sourceUri, destUri, new MoveParameters());
+    }
+
     /// <summary>
     /// 异步移动源资源到目标 URI，按各自 URI 提交源锁与目标锁。
     /// </summary>
@@ -784,7 +933,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步移动任务；多状态内部错误会使 IsSuccessful 为 false，不能仅依据 HTTP 207 判断成功。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Move(string sourceUri, string destUri, MoveParameters parameters) => Move(CreateUri(sourceUri), CreateUri(destUri), parameters);
+    public Task<WebDavResponse> Move(string sourceUri, string destUri, MoveParameters parameters)
+    {
+        return Move(CreateUri(sourceUri), CreateUri(destUri), parameters);
+    }
+
     /// <summary>
     /// 异步移动源资源到目标 URI，按各自 URI 提交源锁与目标锁。
     /// </summary>
@@ -798,13 +951,13 @@ public sealed partial class WebDavClient : IWebDavClient
     public async Task<WebDavResponse> Move(Uri sourceUri, Uri destUri, MoveParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        using var request = CreateRequest(sourceUri, "MOVE");
-        var destination = ResolveUri(destUri);
+        using HttpRequestMessage request = CreateRequest(sourceUri, "MOVE");
+        Uri destination = ResolveUri(destUri);
         request.Headers.Add("Destination", destination.AbsoluteUri);
         request.Headers.Add("Overwrite", parameters.Overwrite ? "T" : "F");
         // 源锁与目标锁不能作为两条无标记 If 头发送，否则会作用到错误资源，或改变条件之间的含义。
         // 先各自绑定绝对 URI，再拼成一个 If 字段，保留每组条件的资源身份。
-        var conditions = new List<string>();
+        List<string> conditions = [];
         if (parameters.SourceLockToken is not null)
             conditions.Add(IfHeaderHelper.Tagged(ResolveUri(sourceUri), parameters.SourceLockToken));
         if (parameters.DestLockToken is not null)
@@ -824,7 +977,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<LockResponse> Lock(string requestUri) => Lock(CreateUri(requestUri));
+    public Task<LockResponse> Lock(string requestUri)
+    {
+        return Lock(CreateUri(requestUri));
+    }
+
     /// <summary>
     /// 异步创建共享或独占写锁，或刷新已有令牌对应的写锁。
     /// </summary>
@@ -834,7 +991,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<LockResponse> Lock(Uri requestUri) => Lock(requestUri, new LockParameters());
+    public Task<LockResponse> Lock(Uri requestUri)
+    {
+        return Lock(requestUri, new LockParameters());
+    }
+
     /// <summary>
     /// 异步创建共享或独占写锁，或刷新已有令牌对应的写锁。
     /// </summary>
@@ -845,7 +1006,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<LockResponse> Lock(string requestUri, LockParameters parameters) => Lock(CreateUri(requestUri), parameters);
+    public Task<LockResponse> Lock(string requestUri, LockParameters parameters)
+    {
+        return Lock(CreateUri(requestUri), parameters);
+    }
+
     /// <summary>
     /// 异步创建共享或独占写锁，或刷新已有令牌对应的写锁。
     /// </summary>
@@ -859,7 +1024,7 @@ public sealed partial class WebDavClient : IWebDavClient
     public async Task<LockResponse> Lock(Uri requestUri, LockParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        using var request = CreateRequest(requestUri, "LOCK");
+        using HttpRequestMessage request = CreateRequest(requestUri, "LOCK");
         // 续期必须没有 lockinfo 正文，也不重新定义 Depth、锁模式或所有者；只有新建锁才发送这些信息。
         if (parameters.LockToken is not null)
             AddLock(request, parameters.LockToken);
@@ -877,7 +1042,7 @@ public sealed partial class WebDavClient : IWebDavClient
                 : "Second-" + Math.Ceiling(timeout.TotalSeconds).ToString(CultureInfo.InvariantCulture));
         }
         parameters.Apply(request);
-        using var response = await SendAsync(request, parameters.CancellationToken).ConfigureAwait(false);
+        using HttpResponseMessage response = await SendAsync(request, parameters.CancellationToken).ConfigureAwait(false);
         IReadOnlyCollection<ActiveLock> locks = [];
         IReadOnlyCollection<WebDavResource> resources = [];
         if ((int)response.StatusCode == 207)
@@ -889,7 +1054,7 @@ public sealed partial class WebDavClient : IWebDavClient
         }
         else if (response.IsSuccessStatusCode)
         {
-            var root = await WebDavXml.ReadDocumentAsync(response, _maxXmlCharacters, parameters.CancellationToken).ConfigureAwait(false);
+            XElement root = await WebDavXml.ReadDocumentAsync(response, _maxXmlCharacters, parameters.CancellationToken).ConfigureAwait(false);
             if (root.Name != WebDavXml.Dav + "prop")
                 throw new InvalidDataException("LOCK did not return DAV:prop.");
             locks = WebDavXml.ParseLockDiscovery(root.Element(WebDavXml.Dav + "lockdiscovery"));
@@ -913,7 +1078,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步解锁任务；结果保留服务器 HTTP 状态和响应头。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Unlock(string requestUri, string lockToken) => Unlock(CreateUri(requestUri), lockToken);
+    public Task<WebDavResponse> Unlock(string requestUri, string lockToken)
+    {
+        return Unlock(CreateUri(requestUri), lockToken);
+    }
+
     /// <summary>
     /// 异步释放指定资源上由锁令牌标识的写锁。
     /// </summary>
@@ -923,7 +1092,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步解锁任务；结果保留服务器 HTTP 状态和响应头。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Unlock(Uri requestUri, string lockToken) => Unlock(requestUri, new UnlockParameters(lockToken));
+    public Task<WebDavResponse> Unlock(Uri requestUri, string lockToken)
+    {
+        return Unlock(requestUri, new UnlockParameters(lockToken));
+    }
+
     /// <summary>
     /// 异步释放指定资源上由锁令牌标识的写锁。
     /// </summary>
@@ -933,7 +1106,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>异步解锁任务；结果保留服务器 HTTP 状态和响应头。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Unlock(string requestUri, UnlockParameters parameters) => Unlock(CreateUri(requestUri), parameters);
+    public Task<WebDavResponse> Unlock(string requestUri, UnlockParameters parameters)
+    {
+        return Unlock(CreateUri(requestUri), parameters);
+    }
+
     /// <summary>
     /// 异步释放指定资源上由锁令牌标识的写锁。
     /// </summary>
@@ -946,7 +1123,7 @@ public sealed partial class WebDavClient : IWebDavClient
     public async Task<WebDavResponse> Unlock(Uri requestUri, UnlockParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        using var request = CreateRequest(requestUri, "UNLOCK");
+        using HttpRequestMessage request = CreateRequest(requestUri, "UNLOCK");
         request.Headers.Add("Lock-Token", "<" + IfHeaderHelper.Normalize(parameters.LockToken) + ">");
         parameters.Apply(request);
         return await SendMutationAsync(request, parameters.CancellationToken).ConfigureAwait(false);
@@ -962,7 +1139,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<PropfindResponse> Search(string requestUri, SearchParameters parameters) => Search(CreateUri(requestUri), parameters);
+    public Task<PropfindResponse> Search(string requestUri, SearchParameters parameters)
+    {
+        return Search(CreateUri(requestUri), parameters);
+    }
+
     /// <summary>
     /// 异步执行 DAV:basicsearch 单属性 LIKE 检索，并完整读取命中资源。
     /// </summary>
@@ -976,7 +1157,7 @@ public sealed partial class WebDavClient : IWebDavClient
     public async Task<PropfindResponse> Search(Uri requestUri, SearchParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        using var request = CreateRequest(requestUri, "SEARCH", parameters, XmlContent(SearchRequestBuilder.BuildRequest(parameters)));
+        using HttpRequestMessage request = CreateRequest(requestUri, "SEARCH", parameters, XmlContent(SearchRequestBuilder.BuildRequest(parameters)));
         return await SendPropertyRequestAsync(request, parameters.CancellationToken).ConfigureAwait(false);
     }
 
@@ -986,8 +1167,8 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>已脱离网络响应生命周期的属性查询结果。</returns>
     private async Task<PropfindResponse> SendPropertyRequestAsync(HttpRequestMessage request, CancellationToken token)
     {
-        using var response = await SendAsync(request, token).ConfigureAwait(false);
-        var resources = await ReadResourcesAsync(response, token, true).ConfigureAwait(false);
+        using HttpResponseMessage response = await SendAsync(request, token).ConfigureAwait(false);
+        IReadOnlyCollection<WebDavResource> resources = await ReadResourcesAsync(response, token, true).ConfigureAwait(false);
         return new PropfindResponse((int)response.StatusCode, response.ReasonPhrase, resources)
         {
             Error = response.IsSuccessStatusCode ? null
@@ -1006,8 +1187,10 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<WebDavReportResponse> ReportAsync(string requestUri, XElement report, WebDavRequestOptions? options = null) =>
-        ReportDocumentAsync(requestUri, report, options);
+    public Task<WebDavReportResponse> ReportAsync(string requestUri, XElement report, WebDavRequestOptions? options = null)
+    {
+        return ReportDocumentAsync(requestUri, report, options);
+    }
 
     /// <summary>
     /// 异步发送 HEAD，仅取得状态和响应头，不下载文件正文。
@@ -1018,7 +1201,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>包含状态码及响应头快照的异步结果，原始 HTTP 响应已释放。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> HeadAsync(string requestUri, WebDavRequestOptions? options = null) => HeadAsync(CreateUri(requestUri), options);
+    public Task<WebDavResponse> HeadAsync(string requestUri, WebDavRequestOptions? options = null)
+    {
+        return HeadAsync(CreateUri(requestUri), options);
+    }
+
     /// <summary>
     /// 异步发送 HEAD，仅取得状态和响应头，不下载文件正文。
     /// </summary>
@@ -1031,8 +1218,8 @@ public sealed partial class WebDavClient : IWebDavClient
     public async Task<WebDavResponse> HeadAsync(Uri requestUri, WebDavRequestOptions? options = null)
     {
         options ??= new WebDavRequestOptions();
-        using var request = CreateRequest(requestUri, "HEAD", options);
-        using var response = await SendAsync(request, options.CancellationToken).ConfigureAwait(false);
+        using HttpRequestMessage request = CreateRequest(requestUri, "HEAD", options);
+        using HttpResponseMessage response = await SendAsync(request, options.CancellationToken).ConfigureAwait(false);
         return new WebDavResponse((int)response.StatusCode, response.ReasonPhrase)
         {
             Error = response.IsSuccessStatusCode ? null
@@ -1049,7 +1236,11 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>包含 HTTP 状态、DAV 合规标识和 Allow 方法列表的异步结果。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<OptionsResponse> OptionsAsync(string requestUri, WebDavRequestOptions? options = null) => OptionsAsync(CreateUri(requestUri), options);
+    public Task<OptionsResponse> OptionsAsync(string requestUri, WebDavRequestOptions? options = null)
+    {
+        return OptionsAsync(CreateUri(requestUri), options);
+    }
+
     /// <summary>
     /// 异步发送 OPTIONS，查询当前资源声明的 DAV 能力及允许方法。
     /// </summary>
@@ -1062,8 +1253,8 @@ public sealed partial class WebDavClient : IWebDavClient
     public async Task<OptionsResponse> OptionsAsync(Uri requestUri, WebDavRequestOptions? options = null)
     {
         options ??= new WebDavRequestOptions();
-        using var request = CreateRequest(requestUri, "OPTIONS", options);
-        using var response = await SendAsync(request, options.CancellationToken).ConfigureAwait(false);
+        using HttpRequestMessage request = CreateRequest(requestUri, "OPTIONS", options);
+        using HttpResponseMessage response = await SendAsync(request, options.CancellationToken).ConfigureAwait(false);
         return new OptionsResponse((int)response.StatusCode, response.ReasonPhrase)
         {
             Error = response.IsSuccessStatusCode ? null
@@ -1082,10 +1273,10 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <exception cref="HttpRequestException">HEAD 返回除 404 以外的非成功状态，或发生网络传输失败。</exception>
     public async Task<bool> ExistsAsync(string requestUri, CancellationToken cancellationToken = default)
     {
-        var response = await HeadAsync(requestUri, new WebDavRequestOptions { CancellationToken = cancellationToken }).ConfigureAwait(false);
+        WebDavResponse response = await HeadAsync(requestUri, new WebDavRequestOptions { CancellationToken = cancellationToken }).ConfigureAwait(false);
         if (response.StatusCode == 404)
             return false;
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
         return true;
     }
 
@@ -1098,8 +1289,8 @@ public sealed partial class WebDavClient : IWebDavClient
     private async Task<WebDavResponse> SendMutationAsync(HttpRequestMessage request, CancellationToken token)
     {
         var preserveRepresentation = GetRequestPreferences(request).Return == WebDavReturnPreference.Representation;
-        using var response = await SendAsync(request, token).ConfigureAwait(false);
-        var result = await ReadDocumentResponseAsync(response, token, preserveRepresentation).ConfigureAwait(false);
+        using HttpResponseMessage response = await SendAsync(request, token).ConfigureAwait(false);
+        WebDavDocumentResponse result = await ReadDocumentResponseAsync(response, token, preserveRepresentation).ConfigureAwait(false);
         result.TreatPropertyErrorsAsFailure = true;
         return result;
     }
@@ -1118,12 +1309,12 @@ public sealed partial class WebDavClient : IWebDavClient
         {
             // 登录页等服务器可能返回 HTTP 200 和 HTML。属性查询必须验证 207，避免把这类内容解释成空目录。
             // HTTP 401/404 等真实失败则由调用方读取状态，不为了强行解析错误正文而掩盖原始原因。
-            if (requireMultiStatus && response.IsSuccessStatusCode)
-                throw new InvalidDataException("Expected HTTP 207 for a DAV property response.");
-            return [];
+            return requireMultiStatus && response.IsSuccessStatusCode
+                ? throw new InvalidDataException("Expected HTTP 207 for a DAV property response.")
+                : [];
         }
         List<WebDavResource> resources = [];
-        await foreach (var element in WebDavXml.ReadResponsesAsync(response, _maxXmlCharacters, token).ConfigureAwait(false))
+        await foreach (XElement? element in WebDavXml.ReadResponsesAsync(response, _maxXmlCharacters, token).ConfigureAwait(false))
             resources.Add(WebDavXml.ParseResource(element));
         return resources.AsReadOnly();
     }
@@ -1139,9 +1330,20 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>需要调用方释放的 HttpRequestMessage。</returns>
     private HttpRequestMessage CreateRequest(Uri uri, string method, WebDavRequestOptions? options = null, HttpContent? content = null)
     {
-        var request = new HttpRequestMessage(new HttpMethod(method), ResolveUri(uri)) { Content = content };
-        try { options?.Apply(request); return request; }
-        catch { request.Dispose(); throw; }
+        HttpRequestMessage request = new(new HttpMethod(method), ResolveUri(uri))
+        {
+            Content = content
+        };
+        try
+        {
+            options?.Apply(request);
+            return request;
+        }
+        catch
+        {
+            request.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -1153,7 +1355,7 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <returns>由后续请求负责释放的 XML HttpContent。</returns>
     private static HttpContent XmlContent(string xml, MediaTypeHeaderValue? mediaType = null)
     {
-        var content = new StringContent(xml, Encoding.UTF8, "application/xml");
+        StringContent content = new(xml, Encoding.UTF8, "application/xml");
         if (mediaType is not null)
         {
             content.Headers.ContentType = MediaTypeHeaderValue.Parse(mediaType.ToString());
@@ -1166,8 +1368,10 @@ public sealed partial class WebDavClient : IWebDavClient
     /// <param name="xml">待发送的完整根元素。</param>
     /// <param name="mediaType">可选 XML 媒体类型。</param>
     /// <returns>使用 UTF-8 编码的请求正文。</returns>
-    private static HttpContent XmlContent(XElement xml, MediaTypeHeaderValue? mediaType = null) =>
-        XmlContent(xml.ToString(SaveOptions.DisableFormatting), mediaType);
+    private static HttpContent XmlContent(XElement xml, MediaTypeHeaderValue? mediaType = null)
+    {
+        return XmlContent(xml.ToString(SaveOptions.DisableFormatting), mediaType);
+    }
 
     /// <summary>
     /// 在存在锁令牌时，为请求 URI 添加无标记的 If 锁条件。
@@ -1192,7 +1396,7 @@ public sealed partial class WebDavClient : IWebDavClient
     {
         ArgumentNullException.ThrowIfNull(uri);
         // 使用 URI 相对解析规则，禁止借用 Path.Combine；Windows 的反斜杠及盘符语义不适用于 DAV 地址。
-        var result = uri.IsAbsoluteUri ? uri : _dispatcher.BaseAddress is { } address ? new Uri(address, uri)
+        Uri result = uri.IsAbsoluteUri ? uri : _dispatcher.BaseAddress is { } address ? new Uri(address, uri)
             : throw new InvalidOperationException("A relative URI requires BaseAddress.");
         ValidateAbsoluteUri(result);
         return result;
@@ -1246,11 +1450,11 @@ public sealed partial class WebDavClient : IWebDavClient
             return; // 服务器可合法忽略 Range 并返回完整 200，是否需要回退由下载调用方根据状态决定。
         // 206 必须给出有效 bytes 区间。终点是包含式位置，因此本段长度为 To - From + 1。
         // 总长度可未知，但一旦提供，就不能返回越过文件末尾的区间。
-        var range = response.Content.Headers.ContentRange;
-        var (from, to) = ByteRangeRequestValidator.GetInterval(range, response.Content.Headers.ContentLength);
+        ContentRangeHeaderValue? range = response.Content.Headers.ContentRange;
+        (long from, long to) = ByteRangeRequestValidator.GetInterval(range, response.Content.Headers.ContentLength);
         if (request.Headers.Range is not { Ranges.Count: 1 } requested)
             return;
-        var item = requested.Ranges.Single();
+        RangeItemHeaderValue item = requested.Ranges.Single();
         // 普通区间核对起点和上界；后缀区间没有 From，需在总长度已知时反推出应有的起点。
         if ((item.From.HasValue && item.From != from)
             || (item.To.HasValue && item.From.HasValue && to > item.To)
@@ -1262,5 +1466,8 @@ public sealed partial class WebDavClient : IWebDavClient
     /// 释放客户端请求调度器，取消在途请求及其响应正文。
     /// </summary>
     /// <remarks>自建 HttpClient 随之释放；宿主注入且未转交所有权的 HttpClient 保持可用。已经返回的流式响应仍应由调用方释放。</remarks>
-    public void Dispose() => _dispatcher.Dispose();
+    public void Dispose()
+    {
+        _dispatcher.Dispose();
+    }
 }

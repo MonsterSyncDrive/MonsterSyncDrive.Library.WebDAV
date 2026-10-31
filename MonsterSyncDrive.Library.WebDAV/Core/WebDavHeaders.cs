@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 集中保存 WebDAV 使用的标准及兼容性 HTTP 头名称。

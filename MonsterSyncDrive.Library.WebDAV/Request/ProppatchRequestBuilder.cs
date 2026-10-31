@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core;
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>
 /// 生成 PROPPATCH 设置标量属性及删除属性的 XML 正文。
@@ -44,10 +44,10 @@ internal static class ProppatchRequestBuilder
         IReadOnlyCollection<XName> propertiesToRemove,
         IReadOnlyCollection<NamespaceAttr> namespaces)
     {
-        var propertyupdate = new XElement("{DAV:}propertyupdate", new XAttribute(XNamespace.Xmlns + "D", "DAV:"));
-        foreach (var ns in namespaces)
+        XElement propertyupdate = new("{DAV:}propertyupdate", new XAttribute(XNamespace.Xmlns + "D", "DAV:"));
+        foreach (NamespaceAttr ns in namespaces)
         {
-            var nsAttr = string.IsNullOrEmpty(ns.Prefix) ? "xmlns" : XNamespace.Xmlns + ns.Prefix;
+            XName nsAttr = string.IsNullOrEmpty(ns.Prefix) ? "xmlns" : XNamespace.Xmlns + ns.Prefix;
             propertyupdate.SetAttributeValue(nsAttr, ns.Namespace);
         }
         if (propertiesToSet.Count != 0)

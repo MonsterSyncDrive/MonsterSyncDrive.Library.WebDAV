@@ -23,7 +23,7 @@
  */
 using System.Net;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 管理 HTTP 发送、客户端生命周期及覆盖响应正文的超时和取消作用域。
@@ -53,9 +53,11 @@ internal sealed class WebDavDispatcher(HttpClient client, bool ownsClient, TimeS
     /// <param name="request">尚未发送或已经发送的请求。</param>
     /// <param name="name">需要查询的 HTTP 字段名。</param>
     /// <returns>逗号连接的字段值；单次请求与默认字段均未提供时返回 null。</returns>
-    internal string? GetEffectiveHeaderValue(HttpRequestMessage request, string name) =>
-        request.Headers.TryGetValues(name, out var values) ? string.Join(", ", values)
+    internal string? GetEffectiveHeaderValue(HttpRequestMessage request, string name)
+    {
+        return request.Headers.TryGetValues(name, out IEnumerable<string>? values) ? string.Join(", ", values)
         : client.DefaultRequestHeaders.TryGetValues(name, out values) ? string.Join(", ", values) : null;
+    }
 
     /// <summary>
     /// 创建关联取消作用域并发送请求，把完整请求的生命周期转交给响应正文。
@@ -69,22 +71,30 @@ internal sealed class WebDavDispatcher(HttpClient client, bool ownsClient, TimeS
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         // 这里不能用 using：响应头到达后，调用方还可能长时间读取正文。
         // 成功时令牌源交给 LifetimeContent，只有发送失败时才在本方法直接释放。
-        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, token);
+        CancellationTokenSource cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, token);
         try
         {
             cancellation.Token.ThrowIfCancellationRequested();
             if (timeout != Timeout.InfiniteTimeSpan)
                 cancellation.CancelAfter(timeout);
-            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation.Token).ConfigureAwait(false);
+            HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation.Token).ConfigureAwait(false);
             try
             {
                 // 包装器同时保留正文头和取消语义，原响应仍可按标准 HttpResponseMessage 方式使用。
                 response.Content = new LifetimeContent(response.Content, cancellation);
                 return response;
             }
-            catch { response.Dispose(); throw; }
+            catch
+            {
+                response.Dispose();
+                throw;
+            }
         }
-        catch { cancellation.Dispose(); throw; }
+        catch
+        {
+            cancellation.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -95,7 +105,10 @@ internal sealed class WebDavDispatcher(HttpClient client, bool ownsClient, TimeS
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
-        try { _lifetime.Cancel(); }
+        try
+        {
+            _lifetime.Cancel();
+        }
         finally
         {
             if (ownsClient)
@@ -144,8 +157,8 @@ internal sealed class WebDavDispatcher(HttpClient client, bool ownsClient, TimeS
             _token = cancellation.Token;
             // 部分 HttpContent 直到读取该属性才调用 TryComputeLength。先触发计算，再复制头部，避免丢失长度。
             _ = inner.Headers.ContentLength;
-            foreach (var header in inner.Headers)
-                Headers.TryAddWithoutValidation(header.Key, header.Value);
+            foreach (KeyValuePair<string, IEnumerable<string>> header in inner.Headers)
+                _ = Headers.TryAddWithoutValidation(header.Key, header.Value);
             // 取消不只是设置标志，还要关闭底层正文，才能打断不接收令牌的 XML 或其他网络读取。
             // 回调只关闭原正文，不递归释放包装器，完整清理由拥有包装器的正常释放路径完成。
             _abort = _token.UnsafeRegister(static state => ((HttpContent)state!).Dispose(), inner);
@@ -169,8 +182,10 @@ internal sealed class WebDavDispatcher(HttpClient client, bool ownsClient, TimeS
         /// <param name="stream">接收原始正文的目标流，本方法不关闭该目标流。</param>
         /// <param name="context">由 HTTP 框架提供并转发给原始正文的传输上下文。</param>
         /// <returns>表示本次正文复制结束的任务。</returns>
-        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
-            SerializeToStreamAsync(stream, context, _token);
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            return SerializeToStreamAsync(stream, context, _token);
+        }
 
         /// <summary>
         /// 复制原始响应正文，同时组合请求级和调用级取消令牌。
@@ -182,9 +197,15 @@ internal sealed class WebDavDispatcher(HttpClient client, bool ownsClient, TimeS
         /// <returns>表示本次正文复制结束的任务。</returns>
         protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context, CancellationToken cancellationToken)
         {
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(_token, cancellationToken);
-            try { await _inner.CopyToAsync(stream, context, linked.Token).ConfigureAwait(false); }
-            catch (Exception) when (linked.IsCancellationRequested) { throw new OperationCanceledException(linked.Token); }
+            using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(_token, cancellationToken);
+            try
+            {
+                await _inner.CopyToAsync(stream, context, linked.Token).ConfigureAwait(false);
+            }
+            catch (Exception) when (linked.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(linked.Token);
+            }
         }
 
         /// <summary>
@@ -192,7 +213,10 @@ internal sealed class WebDavDispatcher(HttpClient client, bool ownsClient, TimeS
         /// </summary>
         /// <remarks>显式传入的令牌用于打开正文流；返回流仍保留请求生命周期令牌，后续每次读取可再传入自己的取消令牌。</remarks>
         /// <returns>支持请求级取消的只读包装流；关闭包装流会释放当前正文包装器。</returns>
-        protected override Task<Stream> CreateContentReadStreamAsync() => CreateContentReadStreamAsync(_token);
+        protected override Task<Stream> CreateContentReadStreamAsync()
+        {
+            return CreateContentReadStreamAsync(_token);
+        }
 
         /// <summary>
         /// 异步打开原始正文流，并包装请求取消和关闭时的生命周期归还行为。
@@ -202,13 +226,16 @@ internal sealed class WebDavDispatcher(HttpClient client, bool ownsClient, TimeS
         /// <returns>支持请求级取消的只读包装流；关闭包装流会释放当前正文包装器。</returns>
         protected override async Task<Stream> CreateContentReadStreamAsync(CancellationToken cancellationToken)
         {
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(_token, cancellationToken);
+            using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(_token, cancellationToken);
             try
             {
-                var stream = await _inner.ReadAsStreamAsync(linked.Token).ConfigureAwait(false);
+                Stream stream = await _inner.ReadAsStreamAsync(linked.Token).ConfigureAwait(false);
                 return new WebDavReadStream(stream, _token, Dispose);
             }
-            catch (Exception) when (linked.IsCancellationRequested) { throw new OperationCanceledException(linked.Token); }
+            catch (Exception) when (linked.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(linked.Token);
+            }
         }
 
         /// <summary>
@@ -222,8 +249,14 @@ internal sealed class WebDavDispatcher(HttpClient client, bool ownsClient, TimeS
             {
                 // 关闭正文流可能反过来触发本包装器的 Dispose。先置释放标志，并等待取消回调注销，避免重复清理。
                 _abort.Dispose();
-                try { _inner.Dispose(); }
-                finally { _cancellation.Dispose(); }
+                try
+                {
+                    _inner.Dispose();
+                }
+                finally
+                {
+                    _cancellation.Dispose();
+                }
                 base.Dispose(disposing);
             }
         }

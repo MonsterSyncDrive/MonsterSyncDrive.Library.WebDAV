@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Request;
+using MonsterSyncDrive.Library.WebDAV.Response;
 using System.Net;
 using System.Net.Http.Headers;
-using MonsterSyncDrive.WebDAV.Request;
-using MonsterSyncDrive.WebDAV.Response;
 
 namespace MonsterSyncDrive.WebDAV;
 
@@ -36,8 +36,10 @@ public sealed partial class WebDavClient
     /// <param name="parameters">含非空 bytes Range 的 GET 参数；可同时提供 If-Range、版本条件和取消令牌。</param>
     /// <returns>拥有原始 HTTP 响应的范围结果，调用方必须释放，并按顺序枚举其分段。</returns>
     /// <remarks>服务器可以合并相邻区间或忽略 Range 返回 200。根据返回的实际 ContentRange 处理各段，而不是假设响应与请求一一对应。</remarks>
-    public Task<WebDavRangeResponse> GetRangesAsync(string requestUri, GetFileParameters parameters) =>
-        GetRangesAsync(CreateUri(requestUri), parameters);
+    public Task<WebDavRangeResponse> GetRangesAsync(string requestUri, GetFileParameters parameters)
+    {
+        return GetRangesAsync(CreateUri(requestUri), parameters);
+    }
 
     /// <summary>异步发送多范围 GET，校验响应类型后返回无需整文件缓冲的下载结果。</summary>
     /// <param name="requestUri">请求资源的 URI，相对 URI 需要配置 BaseAddress。</param>
@@ -48,26 +50,30 @@ public sealed partial class WebDavClient
     public async Task<WebDavRangeResponse> GetRangesAsync(Uri requestUri, GetFileParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        using var request = CreateRequest(requestUri, "GET");
+        using HttpRequestMessage request = CreateRequest(requestUri, "GET");
         request.Headers.Add("Translate", "f");
         request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("identity"));
         request.Headers.Range = parameters.Range;
         request.Headers.IfRange = parameters.IfRange;
         parameters.Apply(request);
-        var requested = request.Headers.Range;
+        RangeHeaderValue? requested = request.Headers.Range;
         if (requested is null || !requested.Unit.Equals("bytes", StringComparison.OrdinalIgnoreCase) || requested.Ranges.Count == 0)
             throw new ArgumentException("A non-empty bytes Range is required.", nameof(parameters));
         // 复制最终请求头，避免自定义头覆盖后仍用旧参数校验，以及调用方之后修改集合影响正在消费的结果。
-        var snapshot = RangeHeaderValue.Parse(requested.ToString());
-        var response = await SendAsync(request, parameters.CancellationToken).ConfigureAwait(false);
+        RangeHeaderValue snapshot = RangeHeaderValue.Parse(requested.ToString());
+        HttpResponseMessage response = await SendAsync(request, parameters.CancellationToken).ConfigureAwait(false);
         try
         {
-            if (response.StatusCode is HttpStatusCode.OK or HttpStatusCode.PartialContent
-                && response.Content.Headers.ContentEncoding.Any(value => !value.Equals("identity", StringComparison.OrdinalIgnoreCase)))
-                throw new InvalidDataException("A byte-range response must contain identity-encoded bytes.");
-            return new WebDavRangeResponse(response, snapshot, parameters.CancellationToken);
+            return response.StatusCode is HttpStatusCode.OK or HttpStatusCode.PartialContent
+                && response.Content.Headers.ContentEncoding.Any(value => !value.Equals("identity", StringComparison.OrdinalIgnoreCase))
+                ? throw new InvalidDataException("A byte-range response must contain identity-encoded bytes.")
+                : new WebDavRangeResponse(response, snapshot, parameters.CancellationToken);
         }
-        catch { response.Dispose(); throw; }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
     }
 }
 

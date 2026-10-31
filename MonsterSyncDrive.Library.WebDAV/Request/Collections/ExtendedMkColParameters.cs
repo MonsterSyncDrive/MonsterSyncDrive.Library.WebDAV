@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request.Collections;
 
 /// <summary>配置 RFC 5689 扩展 MKCOL 的资源类型和创建时原子设置的属性。</summary>
 public sealed class ExtendedMkColParameters : WebDavRequestOptions
@@ -38,7 +38,10 @@ public sealed class ExtendedMkColParameters : WebDavRequestOptions
     public IReadOnlyCollection<XElement> XmlPropertiesToSet { get; set; } = [];
 
     /// <summary>获取或设置创建资源时提交的锁令牌；显式 IfConditions 或 Headers 可覆盖其简化条件。</summary>
-    public string? LockToken { get; set; }
+    public string? LockToken
+    {
+        get; set;
+    }
 
     /// <summary>构造不可与普通属性混淆的扩展 MKCOL XML 正文。</summary>
     /// <returns>包含 DAV:set/DAV:prop 的 DAV:mkcol 元素。</returns>
@@ -47,18 +50,18 @@ public sealed class ExtendedMkColParameters : WebDavRequestOptions
         ArgumentNullException.ThrowIfNull(ResourceTypes);
         ArgumentNullException.ThrowIfNull(PropertiesToSet);
         ArgumentNullException.ThrowIfNull(XmlPropertiesToSet);
-        var dav = WebDavXml.Dav;
+        XNamespace dav = WebDavXml.Dav;
         if (!ResourceTypes.Contains(dav + "collection"))
             throw new ArgumentException("Extended MKCOL resourcetype must include DAV:collection.", nameof(ResourceTypes));
         if (ResourceTypes.Any(name => name is null || name.NamespaceName.Length == 0))
             throw new ArgumentException("Resource types must use qualified XML names.", nameof(ResourceTypes));
         if (XmlPropertiesToSet.Any(element => element is null))
             throw new ArgumentException("XML property elements cannot be null.", nameof(XmlPropertiesToSet));
-        var names = PropertiesToSet.Keys.Concat(XmlPropertiesToSet.Select(element => element.Name)).ToArray();
+        XName[] names = PropertiesToSet.Keys.Concat(XmlPropertiesToSet.Select(element => element.Name)).ToArray();
         // resourcetype 只能由 ResourceTypes 生成一次，否则不同设置分组可能对同一属性提出冲突要求。
-        if (names.Contains(dav + "resourcetype") || names.Distinct().Count() != names.Length)
-            throw new ArgumentException("A property may occur only once; set resourcetype using ResourceTypes.");
-        return new XElement(dav + "mkcol", new XElement(dav + "set", new XElement(dav + "prop",
+        return names.Contains(dav + "resourcetype") || names.Distinct().Count() != names.Length
+            ? throw new ArgumentException("A property may occur only once; set resourcetype using ResourceTypes.")
+            : new XElement(dav + "mkcol", new XElement(dav + "set", new XElement(dav + "prop",
             new XElement(dav + "resourcetype", ResourceTypes.Distinct().Select(name => new XElement(name))),
             PropertiesToSet.Select(property => new XElement(property.Key, property.Value)),
             XmlPropertiesToSet.Select(element => new XElement(element)))));

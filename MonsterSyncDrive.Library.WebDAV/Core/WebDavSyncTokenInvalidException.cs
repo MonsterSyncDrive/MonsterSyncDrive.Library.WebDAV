@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Response;
 using System.Net;
-using MonsterSyncDrive.WebDAV.Response;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 表示服务器明确拒绝集合旧同步令牌，调用方必须自行决定何时重新建立完整快照。
@@ -45,6 +45,9 @@ public sealed class WebDavSyncTokenInvalidException : HttpRequestException
     }
 
     /// <summary>获取服务器的原始同步失败快照，包括被拒绝令牌、XML、状态和 DAV 错误详情。</summary>
-    public WebDavSyncResponse Response { get; }
+    public WebDavSyncResponse Response
+    {
+        get;
+    }
 }
 

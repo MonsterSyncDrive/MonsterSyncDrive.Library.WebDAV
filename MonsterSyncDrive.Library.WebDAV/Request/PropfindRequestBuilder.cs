@@ -21,11 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Helpers;
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Helpers;
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>
 /// 生成 PROPFIND 各种查询形式的 DAV XML 正文。
@@ -44,13 +44,16 @@ internal static class PropfindRequestBuilder
     public static string BuildRequest(
         PropfindRequestType requestType,
         IReadOnlyCollection<XName> customProperties,
-        IReadOnlyCollection<NamespaceAttr> namespaces) => requestType switch
+        IReadOnlyCollection<NamespaceAttr> namespaces)
+    {
+        return requestType switch
         {
             PropfindRequestType.NamedProperties => BuildNamedPropRequest(customProperties, namespaces),
             PropfindRequestType.AllProperties => BuildAllPropRequest(customProperties, namespaces),
             PropfindRequestType.PropertyNames => new XElement("{DAV:}propfind", new XElement("{DAV:}propname")).ToString(),
             _ => throw new ArgumentOutOfRangeException(nameof(requestType))
         };
+    }
 
     /// <summary>
     /// 构建 allprop 请求，并在存在自定义属性时附加 include 元素。
@@ -60,8 +63,8 @@ internal static class PropfindRequestBuilder
     /// <returns>带 XML 声明的 DAV:propfind 文档。</returns>
     private static string BuildAllPropRequest(IReadOnlyCollection<XName> customProperties, IReadOnlyCollection<NamespaceAttr> namespaces)
     {
-        var doc = new XDocument(new XDeclaration("1.0", "utf-8", null));
-        var propfind = new XElement(
+        XDocument doc = new(new XDeclaration("1.0", "utf-8", null));
+        XElement propfind = new(
             "{DAV:}propfind",
             new XAttribute(XNamespace.Xmlns + "D", "DAV:"),
             new XElement("{DAV:}allprop")
@@ -69,13 +72,13 @@ internal static class PropfindRequestBuilder
         if (customProperties.Count != 0)
         {
             // allprop 不保证返回服务器的每一种扩展属性，include 用于显式要求这些额外属性。
-            var include = new XElement("{DAV:}include");
-            foreach (var ns in namespaces)
+            XElement include = new("{DAV:}include");
+            foreach (NamespaceAttr ns in namespaces)
             {
-                var nsAttr = string.IsNullOrEmpty(ns.Prefix) ? "xmlns" : XNamespace.Xmlns + ns.Prefix;
+                XName nsAttr = string.IsNullOrEmpty(ns.Prefix) ? "xmlns" : XNamespace.Xmlns + ns.Prefix;
                 include.SetAttributeValue(nsAttr, ns.Namespace);
             }
-            foreach (var prop in customProperties)
+            foreach (XName prop in customProperties)
             {
                 include.Add(new XElement(prop));
             }
@@ -93,13 +96,13 @@ internal static class PropfindRequestBuilder
     /// <returns>带 XML 声明的指定属性查询文档；属性列表为空时仍包含空 prop。</returns>
     private static string BuildNamedPropRequest(IReadOnlyCollection<XName> customProperties, IReadOnlyCollection<NamespaceAttr> namespaces)
     {
-        var doc = new XDocument(new XDeclaration("1.0", "utf-8", null));
-        var propfind = new XElement("{DAV:}propfind", new XAttribute(XNamespace.Xmlns + "D", "DAV:"));
+        XDocument doc = new(new XDeclaration("1.0", "utf-8", null));
+        XElement propfind = new("{DAV:}propfind", new XAttribute(XNamespace.Xmlns + "D", "DAV:"));
         // 即使没有指定属性，也保留完整的 prop 元素。
-        var propEl = new XElement("{DAV:}prop", customProperties.Select(prop => new XElement(prop)));
-        foreach (var ns in namespaces)
+        XElement propEl = new("{DAV:}prop", customProperties.Select(prop => new XElement(prop)));
+        foreach (NamespaceAttr ns in namespaces)
         {
-            var nsAttr = string.IsNullOrEmpty(ns.Prefix) ? "xmlns" : XNamespace.Xmlns + ns.Prefix;
+            XName nsAttr = string.IsNullOrEmpty(ns.Prefix) ? "xmlns" : XNamespace.Xmlns + ns.Prefix;
             propEl.SetAttributeValue(nsAttr, ns.Namespace);
         }
         propfind.Add(propEl);

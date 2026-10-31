@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 表示 HTTP 207 响应中单个属性的状态码和可选说明。
@@ -60,21 +60,33 @@ public class WebDavPropertyStatus
     /// <summary>
     /// 获取本条状态对应的完整属性名称。
     /// </summary>
-    public XName Name { get; }
+    public XName Name
+    {
+        get;
+    }
 
     /// <summary>
     /// 获取 DAV:propstat 中对应属性的 HTTP 状态码。
     /// </summary>
-    public int StatusCode { get; }
+    public int StatusCode
+    {
+        get;
+    }
 
     /// <summary>
     /// 获取服务器对该属性状态提供的可选说明。
     /// </summary>
     /// <value>没有提供说明时为 null。</value>
-    public string? Description { get; }
+    public string? Description
+    {
+        get;
+    }
 
     /// <summary>获取当前属性所在 propstat 的结构化错误详情，未提供时为 null。</summary>
-    public WebDavError? Error { get; internal set; }
+    public WebDavError? Error
+    {
+        get; internal set;
+    }
 
     /// <summary>
     /// 获取属性状态是否为 HTTP 200 至 299。
@@ -86,5 +98,8 @@ public class WebDavPropertyStatus
     /// 返回当前WebDavPropertyStatus的状态或属性概要，便于日志记录和调试。
     /// </summary>
     /// <returns>包含当前对象关键字段的描述字符串，不触发网络请求。</returns>
-    public override string ToString() => $"{{ Name: {Name}, StatusCode: {StatusCode}, Description: {Description} }}";
+    public override string ToString()
+    {
+        return $"{{ Name: {Name}, StatusCode: {StatusCode}, Description: {Description} }}";
+    }
 }

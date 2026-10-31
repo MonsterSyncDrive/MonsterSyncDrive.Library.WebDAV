@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core;
 using System.Net.Http.Headers;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>
 /// 配置创建写锁或刷新已有写锁时的范围、所有者和租约。
@@ -36,7 +36,10 @@ public class LockParameters : WebDavRequestOptions
     /// 获取或设置要续期的已有锁令牌。
     /// </summary>
     /// <value>非 null 时发送空正文 LOCK 并提交 If 条件；null 表示创建新锁。</value>
-    public string? LockToken { get; set; }
+    public string? LockToken
+    {
+        get; set;
+    }
     /// <summary>
     /// 初始化 LockParameters 的默认请求设置。
     /// </summary>
@@ -50,29 +53,44 @@ public class LockParameters : WebDavRequestOptions
     /// 获取或设置新建锁的共享或独占模式。
     /// </summary>
     /// <value>默认枚举值 Shared；续期已有锁时不重新发送 lockinfo，因此此值不参与续期正文。</value>
-    public LockScope LockScope { get; set; }
+    public LockScope LockScope
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置请求的服务器锁租约。
     /// </summary>
     /// <value>null 不发送 Timeout；Timeout.InfiniteTimeSpan 请求 Infinite，否则取正秒数并向上取整，服务器可能返回不同租约。</value>
-    public TimeSpan? Timeout { get; set; }
+    public TimeSpan? Timeout
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置新建锁的覆盖范围。
     /// </summary>
     /// <value>null 默认 infinity；续期时不发送 Depth，服务器保留原锁范围。</value>
-    public ApplyTo.Lock? ApplyTo { get; set; }
+    public ApplyTo.Lock? ApplyTo
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置新建锁的所有者说明。
     /// </summary>
     /// <value>默认 null，省略 owner；该值不参与身份认证，续期时也不重写所有者。</value>
-    public LockOwner? Owner { get; set; }
+    public LockOwner? Owner
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置 XML 请求正文的媒体类型。
     /// </summary>
     /// <value>默认 application/xml; charset=utf-8；正文固定用 UTF-8 编码，调用方指定的字符集应与实际编码保持一致。</value>
-    public MediaTypeHeaderValue ContentType { get; set; }
+    public MediaTypeHeaderValue ContentType
+    {
+        get; set;
+    }
 }

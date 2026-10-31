@@ -21,12 +21,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV;
+using MonsterSyncDrive.Library.WebDAV.Request;
+using MonsterSyncDrive.Library.WebDAV.Response;
 using System.Buffers;
 using System.Net;
 using System.Xml;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Request;
-using MonsterSyncDrive.WebDAV.Response;
 
 namespace MonsterSyncDrive.WebDAV;
 
@@ -45,26 +46,28 @@ public sealed partial class WebDavClient
         IReadOnlyCollection<KeyValuePair<string, string>>? protocolHeaders = null)
     {
         options ??= new WebDavRequestOptions();
-        using var request = CreateRequest(uri, method, null,
+        using HttpRequestMessage request = CreateRequest(uri, method, null,
             body is null ? null : XmlContent(body));
         if (protocolHeaders is not null)
-            foreach (var header in protocolHeaders)
+            foreach (KeyValuePair<string, string> header in protocolHeaders)
                 request.Headers.Add(header.Key, header.Value);
         options.Apply(request);
-        var returnPreference = GetRequestPreferences(request).Return;
-        var preserveRepresentation = returnPreference == WebDavReturnPreference.Representation;
-        using var response = await SendAsync(request, options.CancellationToken).ConfigureAwait(false);
-        var result = await ReadDocumentResponseAsync(response, options.CancellationToken, preserveRepresentation).ConfigureAwait(false);
+        WebDavReturnPreference returnPreference = GetRequestPreferences(request).Return;
+        bool preserveRepresentation = returnPreference == WebDavReturnPreference.Representation;
+        using HttpResponseMessage response = await SendAsync(request, options.CancellationToken).ConfigureAwait(false);
+        WebDavDocumentResponse result = await ReadDocumentResponseAsync(response, options.CancellationToken, preserveRepresentation).ConfigureAwait(false);
         result.WasMinimalResponseRequested = returnPreference == WebDavReturnPreference.Minimal;
-        result.RequestedDepth = request.Headers.TryGetValues("Depth", out var depthValues) ? string.Join(", ", depthValues) : null;
+        result.RequestedDepth = request.Headers.TryGetValues("Depth", out IEnumerable<string>? depthValues) ? string.Join(", ", depthValues) : null;
         return result;
     }
 
     /// <summary>读取最终请求实际发送的偏好，包含原始 Headers 对强类型偏好的覆盖。</summary>
     /// <param name="request">已应用全部请求选项的消息。</param>
     /// <returns>解析后的偏好配置；未提供头时为空配置。</returns>
-    private WebDavPreferences GetRequestPreferences(HttpRequestMessage request) =>
-        WebDavPreferences.Parse(_dispatcher.GetEffectiveHeaderValue(request, "Prefer"));
+    private WebDavPreferences GetRequestPreferences(HttpRequestMessage request)
+    {
+        return WebDavPreferences.Parse(_dispatcher.GetEffectiveHeaderValue(request, "Prefer"));
+    }
 
     /// <summary>在保持 HTTP 状态的同时读取有界的完整 XML 文档或原始返回表示。</summary>
     /// <param name="response">需要接收正文的原始 HTTP 响应。</param>
@@ -76,15 +79,15 @@ public sealed partial class WebDavClient
     {
         // 完整 REPORT 必须保留根级字段，不能只依赖旧的逐 response 枚举器。
         // 先有界地读完正文，既可正确接受 204，也不会把非 XML 错误页误当作协议 XML。
-        var bytes = await ReadBoundedProtocolBodyAsync(response.Content, token).ConfigureAwait(false);
+        byte[] bytes = await ReadBoundedProtocolBodyAsync(response.Content, token).ConfigureAwait(false);
         XElement? document = null;
-        var mediaType = response.Content.Headers.ContentType?.MediaType;
-        var xmlMediaType = mediaType?.EndsWith("/xml", StringComparison.OrdinalIgnoreCase) == true
+        string? mediaType = response.Content.Headers.ContentType?.MediaType;
+        bool xmlMediaType = mediaType?.EndsWith("/xml", StringComparison.OrdinalIgnoreCase) == true
             || mediaType?.EndsWith("+xml", StringComparison.OrdinalIgnoreCase) == true;
         // 表示正文属于资源本身：二进制数据恰好以 '<' 开头也不一定是 XML。
         // 仅在服务器未明确给出媒体类型时探测，207 则始终必须是完整 DAV 文档。
-        var representationOnly = preserveRepresentation && response.StatusCode != HttpStatusCode.MultiStatus;
-        if (bytes.Length > 0 && (xmlMediaType || (!representationOnly || mediaType is null) && LooksLikeXml(bytes)))
+        bool representationOnly = preserveRepresentation && response.StatusCode != HttpStatusCode.MultiStatus;
+        if (bytes.Length > 0 && (xmlMediaType || ((!representationOnly || mediaType is null) && LooksLikeXml(bytes))))
         {
             try
             {
@@ -119,13 +122,13 @@ public sealed partial class WebDavClient
     {
         // XML 字符可能编码为多个字节，网络缓冲上限按 UTF-8 最大四字节系数预留；
         // XmlReader 随后仍独立检查真正的字符上限。流式文件读写不走这条协议文档路径。
-        var byteLimit = Math.Min(int.MaxValue, _maxXmlCharacters > int.MaxValue / 4
+        long byteLimit = Math.Min(int.MaxValue, _maxXmlCharacters > int.MaxValue / 4
             ? int.MaxValue : _maxXmlCharacters * 4);
         if (content.Headers.ContentLength is { } length && length > byteLimit)
             throw new InvalidDataException("DAV response exceeds the configured protocol body limit.");
-        await using var source = await content.ReadAsStreamAsync(token).ConfigureAwait(false);
+        await using Stream source = await content.ReadAsStreamAsync(token).ConfigureAwait(false);
         using var destination = new MemoryStream();
-        var buffer = ArrayPool<byte>.Shared.Rent(81920);
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(81920);
         try
         {
             int count;
@@ -137,7 +140,10 @@ public sealed partial class WebDavClient
             }
             return destination.ToArray();
         }
-        finally { ArrayPool<byte>.Shared.Return(buffer); }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     /// <summary>识别无 Content-Type 的 XML 正文，包括 UTF-8/UTF-16/UTF-32 字节序标记。</summary>
@@ -145,10 +151,10 @@ public sealed partial class WebDavClient
     /// <returns>正文以 XML 起始标记或 Unicode 字节序标记开头时为 true。</returns>
     private static bool LooksLikeXml(ReadOnlySpan<byte> bytes)
     {
-        var index = 0;
+        int index = 0;
         while (index < bytes.Length && bytes[index] is 9 or 10 or 13 or 32)
             index++;
-        return index < bytes.Length && bytes[index] == '<'
+        return (index < bytes.Length && bytes[index] == '<')
             || bytes.StartsWith<byte>([0xEF, 0xBB, 0xBF])
             || bytes.StartsWith<byte>([0xFF, 0xFE])
             || bytes.StartsWith<byte>([0xFE, 0xFF])

@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Helpers;
+using MonsterSyncDrive.Library.WebDAV.Helpers;
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 保存以完整 XML 名称标识的 WebDAV 属性及其内容。
@@ -49,13 +49,19 @@ public class WebDavProperty
     /// <summary>
     /// 获取属性的完整 XML 名称，包含命名空间和本地名称。
     /// </summary>
-    public XName Name { get; }
+    public XName Name
+    {
+        get;
+    }
 
     /// <summary>
     /// 获取属性的内层 XML，保留嵌套元素、转义字符和混合内容。
     /// </summary>
     /// <value>普通文本可能包含 XML 转义；需要解码文本时使用 TextValue。</value>
-    public string Value { get; }
+    public string Value
+    {
+        get;
+    }
 
     /// <summary>
     /// 获取属性的文本内容，复用已有 XML 快照或解析内层 XML，合并后代文本并解码实体。
@@ -88,7 +94,7 @@ public class WebDavProperty
         // 从完整元素构造的属性保留了外层元素属性；返回副本，避免调用方修改保存的响应快照。
         if (_element is not null)
             return new XElement(_element);
-        var result = new XElement(Name);
+        XElement result = new(Name);
         result.SetInnerXml(Value);
         return result;
     }
@@ -97,5 +103,8 @@ public class WebDavProperty
     /// 返回当前WebDavProperty的状态或属性概要，便于日志记录和调试。
     /// </summary>
     /// <returns>包含当前对象关键字段的描述字符串，不触发网络请求。</returns>
-    public override string ToString() => $"{{ Name: {Name}, Value: {Value} }}";
+    public override string ToString()
+    {
+        return $"{{ Name: {Name}, Value: {Value} }}";
+    }
 }

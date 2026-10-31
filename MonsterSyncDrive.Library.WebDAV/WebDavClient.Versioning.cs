@@ -21,10 +21,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV;
+using MonsterSyncDrive.Library.WebDAV.Core.Versioning;
+using MonsterSyncDrive.Library.WebDAV.Request;
+using MonsterSyncDrive.Library.WebDAV.Request.Versioning;
+using MonsterSyncDrive.Library.WebDAV.Response.Versioning;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Request;
-using MonsterSyncDrive.WebDAV.Response;
 
 namespace MonsterSyncDrive.WebDAV;
 
@@ -62,7 +64,7 @@ public sealed partial class WebDavClient
     public Task<WebDavVersioningResponse> CheckinAsync(string requestUri, CheckinParameters? parameters = null)
     {
         parameters ??= new CheckinParameters();
-        var body = new XElement(WebDavXml.Dav + "checkin",
+        XElement body = new(WebDavXml.Dav + "checkin",
             parameters.KeepCheckedOut ? new XElement(WebDavXml.Dav + "keep-checked-out") : null,
             parameters.ForkOk ? new XElement(WebDavXml.Dav + "fork-ok") : null);
         return SendVersioningRequestAsync(requestUri, "CHECKIN",
@@ -87,12 +89,14 @@ public sealed partial class WebDavClient
     {
         ArgumentNullException.ThrowIfNull(parameters);
         ArgumentException.ThrowIfNullOrEmpty(parameters.LabelName);
-        var action = parameters.Action switch
+        string action = parameters.Action switch
         {
-            VersionLabelAction.Set => "set", VersionLabelAction.Add => "add", VersionLabelAction.Remove => "remove",
+            VersionLabelAction.Set => "set",
+            VersionLabelAction.Add => "add",
+            VersionLabelAction.Remove => "remove",
             _ => throw new ArgumentOutOfRangeException(nameof(parameters))
         };
-        var body = new XElement(WebDavXml.Dav + "label", new XElement(WebDavXml.Dav + action,
+        XElement body = new(WebDavXml.Dav + "label", new XElement(WebDavXml.Dav + action,
             new XElement(WebDavXml.Dav + "label-name", parameters.LabelName)));
         return SendVersioningRequestAsync(requestUri, "LABEL", VersioningXml.AddExtensions(body, parameters.ExtensionElements),
             parameters, "label-response", true);
@@ -145,8 +149,9 @@ public sealed partial class WebDavClient
         ArgumentNullException.ThrowIfNull(parameters);
         if (parameters.Version is not null && parameters.LabelName is not null)
             throw new ArgumentException("UPDATE version and label-name are mutually exclusive.", nameof(parameters));
-        if (parameters.LabelName is not null) ArgumentException.ThrowIfNullOrEmpty(parameters.LabelName);
-        var body = new XElement(WebDavXml.Dav + "update",
+        if (parameters.LabelName is not null)
+            ArgumentException.ThrowIfNullOrEmpty(parameters.LabelName);
+        XElement body = new(WebDavXml.Dav + "update",
             parameters.Version is null ? null : new XElement(WebDavXml.Dav + "version", VersioningXml.Href(parameters.Version)),
             parameters.LabelName is null ? null : new XElement(WebDavXml.Dav + "label-name", parameters.LabelName),
             parameters.Properties.Count == 0 ? null : VersioningXml.Prop(parameters.Properties));
@@ -161,14 +166,16 @@ public sealed partial class WebDavClient
     public Task<WebDavVersioningResponse> MergeAsync(string requestUri, MergeParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        if (parameters.Sources.Count == 0) throw new ArgumentException("MERGE requires at least one source.", nameof(parameters));
-        var body = new XElement(WebDavXml.Dav + "merge", VersioningXml.Hrefs("source", parameters.Sources),
+        if (parameters.Sources.Count == 0)
+            throw new ArgumentException("MERGE requires at least one source.", nameof(parameters));
+        XElement body = new(WebDavXml.Dav + "merge", VersioningXml.Hrefs("source", parameters.Sources),
             parameters.NoAutoMerge ? new XElement(WebDavXml.Dav + "no-auto-merge") : null,
             parameters.NoCheckout ? new XElement(WebDavXml.Dav + "no-checkout") : null,
             parameters.CheckinActivity ? new XElement(WebDavXml.Dav + "checkin-activity") : null,
             parameters.Properties.Count == 0 ? null : VersioningXml.Prop(parameters.Properties));
         // RFC3253 允许 MERGE 复用 CHECKOUT 的合法子元素；先复制子元素，避免把 checkout 外层根误嵌入 merge。
-        if (parameters.Checkout is not null) body.Add(parameters.Checkout.ToXml().Elements().Select(element => new XElement(element)));
+        if (parameters.Checkout is not null)
+            body.Add(parameters.Checkout.ToXml().Elements().Select(element => new XElement(element)));
         return SendVersioningRequestAsync(requestUri, "MERGE", VersioningXml.AddExtensions(body, parameters.ExtensionElements),
             parameters, "multistatus", true);
     }
@@ -180,7 +187,7 @@ public sealed partial class WebDavClient
     public Task<WebDavVersioningResponse> GetVersioningInfoAsync(string requestUri, VersioningRequestOptions? options = null)
     {
         options ??= new VersioningRequestOptions();
-        var body = new XElement(WebDavXml.Dav + "propfind", VersioningXml.Prop(WebDavVersioningInfo.PropertyNames));
+        XElement body = new(WebDavXml.Dav + "propfind", VersioningXml.Prop(WebDavVersioningInfo.PropertyNames));
         return SendVersioningRequestAsync(requestUri, "PROPFIND", body, options, "multistatus", false, true);
     }
 
@@ -191,7 +198,7 @@ public sealed partial class WebDavClient
     /// <returns>完整版本响应，保留 XML、响应头与逐资源状态。</returns>
     public Task<WebDavVersioningResponse> GetVersionHistoryAsync(string requestUri, IReadOnlyCollection<XName>? properties = null, VersioningRequestOptions? options = null)
     {
-        var body = new XElement(WebDavXml.Dav + "version-tree", VersioningXml.Prop(properties ?? WebDavVersioningInfo.PropertyNames));
+        XElement body = new(WebDavXml.Dav + "version-tree", VersioningXml.Prop(properties ?? WebDavVersioningInfo.PropertyNames));
         return SendVersioningRequestAsync(requestUri, "REPORT", body, options, "multistatus", false);
     }
 
@@ -203,7 +210,7 @@ public sealed partial class WebDavClient
     public Task<WebDavVersioningResponse> ExpandVersionPropertiesAsync(string requestUri, IReadOnlyCollection<ExpandedVersionProperty> properties, VersioningRequestOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(properties);
-        var body = new XElement(WebDavXml.Dav + "expand-property", properties.Select(property => property.ToXml()));
+        XElement body = new(WebDavXml.Dav + "expand-property", properties.Select(property => property.ToXml()));
         return SendVersioningRequestAsync(requestUri, "REPORT", body, options, "multistatus", false);
     }
 
@@ -216,8 +223,9 @@ public sealed partial class WebDavClient
     public Task<WebDavVersioningResponse> LocateVersionsByHistoryAsync(string requestUri, IReadOnlyCollection<Uri> histories, IReadOnlyCollection<XName>? properties = null, VersioningRequestOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(histories);
-        if (histories.Count == 0) throw new ArgumentException("At least one version history is required.", nameof(histories));
-        var body = new XElement(WebDavXml.Dav + "locate-by-history", VersioningXml.Hrefs("version-history-set", histories),
+        if (histories.Count == 0)
+            throw new ArgumentException("At least one version history is required.", nameof(histories));
+        XElement body = new(WebDavXml.Dav + "locate-by-history", VersioningXml.Hrefs("version-history-set", histories),
             VersioningXml.Prop(properties ?? WebDavVersioningInfo.PropertyNames));
         return SendVersioningRequestAsync(requestUri, "REPORT", body, options, "multistatus", false);
     }
@@ -229,7 +237,7 @@ public sealed partial class WebDavClient
     /// <returns>完整版本响应，保留 XML、响应头与逐资源状态。</returns>
     public Task<WebDavVersioningResponse> PreviewMergeAsync(string requestUri, Uri source, VersioningRequestOptions? options = null)
     {
-        var body = new XElement(WebDavXml.Dav + "merge-preview", new XElement(WebDavXml.Dav + "source", VersioningXml.Href(source)));
+        XElement body = new(WebDavXml.Dav + "merge-preview", new XElement(WebDavXml.Dav + "source", VersioningXml.Href(source)));
         return SendVersioningRequestAsync(requestUri, "REPORT", body, options, "merge-preview-report", false);
     }
 
@@ -240,7 +248,7 @@ public sealed partial class WebDavClient
     /// <returns>完整版本响应，保留 XML、响应头与逐资源状态。</returns>
     public Task<WebDavVersioningResponse> CompareBaselinesAsync(string requestUri, Uri compareBaseline, VersioningRequestOptions? options = null)
     {
-        var body = new XElement(WebDavXml.Dav + "compare-baseline", VersioningXml.Href(compareBaseline));
+        XElement body = new(WebDavXml.Dav + "compare-baseline", VersioningXml.Href(compareBaseline));
         return SendVersioningRequestAsync(requestUri, "REPORT", body, options, "compare-baseline-report", false);
     }
 
@@ -251,7 +259,7 @@ public sealed partial class WebDavClient
     /// <returns>完整版本响应，保留 XML、响应头与逐资源状态。</returns>
     public Task<WebDavVersioningResponse> GetLatestActivityVersionAsync(string requestUri, Uri activity, VersioningRequestOptions? options = null)
     {
-        var body = new XElement(WebDavXml.Dav + "latest-activity-version", VersioningXml.Href(activity));
+        XElement body = new(WebDavXml.Dav + "latest-activity-version", VersioningXml.Href(activity));
         return SendVersioningRequestAsync(requestUri, "REPORT", body, options, "latest-activity-version-report", false);
     }
 
@@ -261,7 +269,7 @@ public sealed partial class WebDavClient
     /// <returns>包含能力标识及创建集合位置的异步结果。</returns>
     public async Task<WebDavVersioningCapabilities> GetVersioningCapabilitiesAsync(string requestUri, WebDavRequestOptions? options = null)
     {
-        var body = new XElement(WebDavXml.Dav + "options", new XElement(WebDavXml.Dav + "version-history-collection-set"),
+        XElement body = new(WebDavXml.Dav + "options", new XElement(WebDavXml.Dav + "version-history-collection-set"),
             new XElement(WebDavXml.Dav + "workspace-collection-set"), new XElement(WebDavXml.Dav + "activity-collection-set"));
         var response = await SendDocumentRequestAsync(CreateUri(requestUri), "OPTIONS", body, options).ConfigureAwait(false);
         return new WebDavVersioningCapabilities(response);
@@ -280,24 +288,30 @@ public sealed partial class WebDavClient
         VersioningRequestOptions? options, string expectedRoot, bool mutation, bool forceDepthZero = false)
     {
         options ??= new VersioningRequestOptions();
-        var headers = new List<KeyValuePair<string, string>> { new("Cache-Control", "no-cache") };
-        if (forceDepthZero) headers.Add(new("Depth", "0"));
-        else if (options.Depth is { } depth) headers.Add(new("Depth", depth switch
-        {
-            VersioningDepth.ResourceOnly => "0", VersioningDepth.ResourceAndChildren => "1",
-            VersioningDepth.ResourceAndDescendants => "infinity", _ => throw new ArgumentOutOfRangeException(nameof(options))
-        }));
+        List<KeyValuePair<string, string>> headers = [new("Cache-Control", "no-cache")];
+        if (forceDepthZero)
+            headers.Add(new("Depth", "0"));
+        else if (options.Depth is { } depth)
+            headers.Add(new("Depth", depth switch
+            {
+                VersioningDepth.ResourceOnly => "0",
+                VersioningDepth.ResourceAndChildren => "1",
+                VersioningDepth.ResourceAndDescendants => "infinity",
+                _ => throw new ArgumentOutOfRangeException(nameof(options))
+            }));
         // Label 是 HTTP 请求头中的 URI 转义 UTF-8 字符串；XML label-name 则保留原始文本。
         // 自定义 Headers 最后覆盖，允许调用方提交自己已编码的字段，避免再编码一次。
-        if (options.LabelSelector is not null) headers.Add(new("Label", Uri.EscapeDataString(options.LabelSelector)));
+        if (options.LabelSelector is not null)
+            headers.Add(new("Label", Uri.EscapeDataString(options.LabelSelector)));
         using var request = CreateRequest(CreateUri(requestUri), method, null,
             body is null ? null : XmlContent(body));
-        foreach (var header in headers) request.Headers.Add(header.Key, header.Value);
+        foreach (var header in headers)
+            request.Headers.Add(header.Key, header.Value);
         options.Apply(request);
         // HttpClient 默认头在发送时才合并。按相同整字段覆盖规则预览最终头，
         // 可以在产生检出副作用前发现 Label 与 apply-to-version 的标准互斥条件。
-        var effectiveDepth = _dispatcher.GetEffectiveHeaderValue(request, "Depth");
-        var effectiveLabel = _dispatcher.GetEffectiveHeaderValue(request, "Label");
+        string? effectiveDepth = _dispatcher.GetEffectiveHeaderValue(request, "Depth");
+        string? effectiveLabel = _dispatcher.GetEffectiveHeaderValue(request, "Label");
         if (method == "CHECKOUT" && effectiveLabel is not null && body?.Element(WebDavXml.Dav + "apply-to-version") is not null)
             throw new ArgumentException("CHECKOUT cannot contain both a Label header and DAV:apply-to-version.", nameof(options));
         var preference = GetRequestPreferences(request).Return;
@@ -335,8 +349,10 @@ public sealed partial class WebDavClient
     /// <param name="name">正文根本地名。</param>
     /// <param name="options">带扩展节点的选项。</param>
     /// <returns>扩展正文，没有扩展时为 null。</returns>
-    private static XElement? VersioningOptionalBody(string name, VersioningRequestOptions options) =>
-        options.ExtensionElements.Count == 0 ? null : VersioningXml.AddExtensions(new XElement(WebDavXml.Dav + name), options.ExtensionElements);
+    private static XElement? VersioningOptionalBody(string name, VersioningRequestOptions options)
+    {
+        return options.ExtensionElements.Count == 0 ? null : VersioningXml.AddExtensions(new XElement(WebDavXml.Dav + name), options.ExtensionElements);
+    }
 }
 
 /// <summary>声明 DeltaV 版本控制、工作区、基线、活动和报告客户端操作。</summary>

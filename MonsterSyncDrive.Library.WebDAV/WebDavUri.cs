@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV;
+namespace MonsterSyncDrive.Library.WebDAV;
 
 /// <summary>
 /// 提供与操作系统路径规则无关的 WebDAV URI 路径编码方法。

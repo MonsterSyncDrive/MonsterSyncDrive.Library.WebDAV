@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 使用普通文本描述 LOCK 请求的锁所有者。
@@ -43,5 +43,8 @@ public class PrincipalLockOwner : LockOwner
     /// <summary>
     /// 获取锁所有者的普通文本说明，序列化时按 XML 文本转义。
     /// </summary>
-    public override string Value { get; }
+    public override string Value
+    {
+        get;
+    }
 }

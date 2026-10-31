@@ -21,11 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Helpers;
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Helpers;
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>
 /// 生成新建写锁所需的 DAV:lockinfo XML 正文。
@@ -40,8 +40,8 @@ internal static class LockRequestBuilder
     /// <returns>带 UTF-8 XML 声明的请求正文字符串。</returns>
     public static string BuildRequestBody(LockParameters lockParams)
     {
-        var doc = new XDocument(new XDeclaration("1.0", "utf-8", null));
-        var lockinfo = new XElement(
+        XDocument doc = new(new XDeclaration("1.0", "utf-8", null));
+        XElement lockinfo = new(
             "{DAV:}lockinfo",
             new XAttribute(XNamespace.Xmlns + "D", "DAV:"),
             GetLockScope(lockParams.LockScope),
@@ -66,7 +66,7 @@ internal static class LockRequestBuilder
     /// <exception cref="ArgumentOutOfRangeException">提供的枚举值不是 Shared 或 Exclusive。</exception>
     private static XElement GetLockScope(LockScope lockScope)
     {
-        var lockscope = new XElement("{DAV:}lockscope");
+        XElement lockscope = new("{DAV:}lockscope");
         switch (lockScope)
         {
             case LockScope.Shared:
@@ -86,5 +86,8 @@ internal static class LockRequestBuilder
     /// </summary>
     /// <param name="lockOwner">提供有效 DAV:owner 的所有者模型。</param>
     /// <returns>独立的 DAV:owner 元素及完整内容。</returns>
-    private static XElement GetLockOwner(LockOwner lockOwner) => lockOwner.ToXElement();
+    private static XElement GetLockOwner(LockOwner lockOwner)
+    {
+        return lockOwner.ToXElement();
+    }
 }

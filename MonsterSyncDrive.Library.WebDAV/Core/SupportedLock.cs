@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>表示 DAV:supportedlock 中的一项锁模式与锁类型能力。</summary>
 /// <remarks>未知的锁模式或类型仍保留原 XML，不把未来扩展错误地解释成标准共享写锁。</remarks>
@@ -41,23 +41,32 @@ public sealed class SupportedLock
         if (element.Name != WebDavXml.Dav + "lockentry")
             throw new ArgumentException("Expected DAV:lockentry.", nameof(element));
         _element = new XElement(element);
-        var scope = element.Element(WebDavXml.Dav + "lockscope");
+        XElement? scope = element.Element(WebDavXml.Dav + "lockscope");
         Scope = scope?.Element(WebDavXml.Dav + "exclusive") is not null ? LockScope.Exclusive
             : scope?.Element(WebDavXml.Dav + "shared") is not null ? LockScope.Shared : null;
         LockType = element.Element(WebDavXml.Dav + "locktype")?.Elements().FirstOrDefault()?.Name;
     }
 
     /// <summary>获取共享或独占锁模式，未识别扩展模式时为 null。</summary>
-    public LockScope? Scope { get; }
+    public LockScope? Scope
+    {
+        get;
+    }
 
     /// <summary>获取完整锁类型名称，例如 DAV:write；缺失时为 null。</summary>
-    public XName? LockType { get; }
+    public XName? LockType
+    {
+        get;
+    }
 
     /// <summary>获取当前条目是否声明支持标准 DAV 写锁。</summary>
     public bool IsWriteLock => LockType == WebDavXml.Dav + "write";
 
     /// <summary>取得服务器完整能力条目的独立 XML 副本。</summary>
     /// <returns>DAV:lockentry 元素及其扩展内容。</returns>
-    public XElement ToXElement() => new(_element);
+    public XElement ToXElement()
+    {
+        return new(_element);
+    }
 }
 

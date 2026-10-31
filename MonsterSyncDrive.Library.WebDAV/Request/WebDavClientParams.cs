@@ -23,7 +23,7 @@
  */
 using System.Net;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>
 /// 配置由 WebDavClient 自行创建和拥有的 HTTP 客户端。
@@ -47,55 +47,82 @@ public class WebDavClientParams
     /// 获取或设置是否使用当前进程的系统默认身份凭据。
     /// </summary>
     /// <value>默认 false；设置显式 Credentials 时客户端关闭系统默认凭据。</value>
-    public bool UseDefaultCredentials { get; set; }
+    public bool UseDefaultCredentials
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置相对请求地址使用的 HTTP(S) 基地址。
     /// </summary>
     /// <value>默认 null，只能发送绝对 URI；目录基地址通常应以 / 结尾，不允许内嵌凭据或片段。</value>
-    public Uri? BaseAddress { get; set; }
+    public Uri? BaseAddress
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置 HTTP 身份认证使用的显式凭据。
     /// </summary>
     /// <value>默认 null；支持的认证方式由平台 HTTP 处理器与服务器共同决定。</value>
-    public ICredentials? Credentials { get; set; }
+    public ICredentials? Credentials
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置创建客户端时复制到 HttpClient 的默认请求头。
     /// </summary>
     /// <value>默认空字典；请求级 Headers 可覆盖同名默认头，客户端创建后修改字典不会重新应用。</value>
-    public IDictionary<string, string> DefaultRequestHeaders { get; set; }
+    public IDictionary<string, string> DefaultRequestHeaders
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置 HTTP 处理器的预身份认证选项。
     /// </summary>
     /// <value>默认 true；首次访问某个认证范围仍可能需要服务器先发起挑战，不保证首个请求就带凭据。</value>
-    public bool PreAuthenticate { get; set; }
+    public bool PreAuthenticate
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置显式网络代理。
     /// </summary>
     /// <value>默认 null 使用 HTTP 处理器的系统代理配置；UseProxy 为 false 时不使用代理。</value>
-    public IWebProxy? Proxy { get; set; }
+    public IWebProxy? Proxy
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置覆盖请求头、正文传输与正文读取等待的请求超时。
     /// </summary>
     /// <value>null 使用 100 秒；Timeout.InfiniteTimeSpan 禁用本库的请求计时，不等同于锁租约 Timeout。</value>
-    public TimeSpan? Timeout { get; set; }
+    public TimeSpan? Timeout
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置 HTTP 处理器是否使用网络代理。
     /// </summary>
     /// <value>默认 true；本机模拟服务或不经代理的连接可显式关闭。</value>
-    public bool UseProxy { get; set; }
+    public bool UseProxy
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置 HTTP 处理器是否自动跟随重定向。
     /// </summary>
     /// <value>默认 false，避免通用重定向改变 DAV 方法或重发带认证信息的请求。</value>
-    public bool AllowAutoRedirect { get; set; }
+    public bool AllowAutoRedirect
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置单个响应 XML 文档的字符总数上限。

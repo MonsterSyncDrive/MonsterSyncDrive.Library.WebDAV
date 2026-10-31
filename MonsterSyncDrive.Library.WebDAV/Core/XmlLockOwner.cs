@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>保存任意 DAV:owner XML，支持元素属性、扩展节点和混合内容。</summary>
 /// <remarks>所有者只是说明数据，不代表当前认证主体。构造和输出都复制 XML，避免修改响应快照。</remarks>
@@ -48,6 +48,9 @@ public sealed class XmlLockOwner : LockOwner
 
     /// <summary>输出保留属性、命名空间和混合内容的所有者副本。</summary>
     /// <returns>可以直接写入 lockinfo 的 DAV:owner 元素。</returns>
-    public override XElement ToXElement() => new(_owner);
+    public override XElement ToXElement()
+    {
+        return new(_owner);
+    }
 }
 

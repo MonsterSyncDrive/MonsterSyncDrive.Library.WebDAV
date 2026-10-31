@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>
 /// 保存 OPTIONS 的 HTTP 状态、DAV 能力标识和允许的方法列表。
@@ -52,5 +52,8 @@ public sealed class OptionsResponse(int statusCode, string? description) : WebDa
     /// </summary>
     /// <param name="name">待拆分的头名称，通常为 DAV 或 Allow。</param>
     /// <returns>规范化后的各项；响应头缺失时返回空数组。</returns>
-    private string[] Split(string name) => (GetHeader(name) ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+    private string[] Split(string name)
+    {
+        return (GetHeader(name) ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+    }
 }

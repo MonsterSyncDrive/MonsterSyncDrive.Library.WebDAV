@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>
 /// 保存 PROPFIND、SEARCH 或多状态 REPORT 返回的资源集合。
@@ -81,17 +81,23 @@ public class PropfindResponse : WebDavResponse
     /// 获取物化后的资源快照集合。
     /// </summary>
     /// <value>构造时枚举并保存一份集合；合法空 multistatus 对应空集合。</value>
-    public IReadOnlyCollection<WebDavResource> Resources { get; }
+    public IReadOnlyCollection<WebDavResource> Resources
+    {
+        get;
+    }
 
     /// <summary>
     /// 获取 HTTP 为 2xx 且资源级状态均成功的结果。
     /// </summary>
     /// <value>可选属性的 404 不直接导致整个查询失败，调用方可检查各资源的 PropertyStatuses。</value>
-    public override bool IsSuccessful => base.IsSuccessful && Resources.All(resource => resource.StatusCode is null or >= 200 and < 300);
+    public override bool IsSuccessful => base.IsSuccessful && Resources.All(resource => resource.StatusCode is null or (>= 200 and < 300));
 
     /// <summary>
     /// 返回当前PropfindResponse的状态或属性概要，便于日志记录和调试。
     /// </summary>
     /// <returns>包含当前对象关键字段的描述字符串，不触发网络请求。</returns>
-    public override string ToString() => $"PROPFIND WebDAV response - StatusCode: {StatusCode}, Description: {Description}";
+    public override string ToString()
+    {
+        return $"PROPFIND WebDAV response - StatusCode: {StatusCode}, Description: {Description}";
+    }
 }

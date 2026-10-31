@@ -23,7 +23,7 @@
  */
 using System.Net.Http.Headers;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>校验单次范围请求的实际返回区间，并计算服务器合法部分满足请求时仍需续取的范围。</summary>
 internal sealed class ByteRangeRequestValidator
@@ -33,13 +33,22 @@ internal sealed class ByteRangeRequestValidator
     /// <summary>已经返回的区间，只保存位置元数据，不保存文件正文。</summary>
     private readonly List<(long From, long To)> _received = [];
     /// <summary>服务器已经报告的完整表示长度；尚未知晓时为 null。</summary>
-    public long? TotalLength { get; private set; }
+    public long? TotalLength
+    {
+        get; private set;
+    }
     /// <summary>完整验证后尚未返回的可满足范围；总长度未知或尚未完整验证时为 null。</summary>
-    public IReadOnlyList<RangeItemHeaderValue>? MissingRanges { get; private set; }
+    public IReadOnlyList<RangeItemHeaderValue>? MissingRanges
+    {
+        get; private set;
+    }
 
     /// <summary>为 bytes Range 请求建立独立的验证状态。</summary>
     /// <param name="request">已经校验为非空 bytes 单位的请求范围。</param>
-    public ByteRangeRequestValidator(RangeHeaderValue request) => _requested = request.Ranges.ToArray();
+    public ByteRangeRequestValidator(RangeHeaderValue request)
+    {
+        _requested = request.Ranges.ToArray();
+    }
 
     /// <summary>验证一个完整的 Content-Range 和可选分段长度，并登记收到的区间。</summary>
     /// <param name="range">当前部分的字节范围。</param>
@@ -48,8 +57,8 @@ internal sealed class ByteRangeRequestValidator
     /// <exception cref="InvalidDataException">范围、长度、总长度或与原请求的关系不合法。</exception>
     public long Add(ContentRangeHeaderValue? range, long? contentLength)
     {
-        var (from, to) = GetInterval(range, contentLength);
-        var length = to - from + 1;
+        (long from, long to) = GetInterval(range, contentLength);
+        long length = to - from + 1;
         if (range!.Length is { } total)
         {
             if (TotalLength.HasValue && TotalLength != total)
@@ -64,8 +73,8 @@ internal sealed class ByteRangeRequestValidator
         {
             // 总长度未知时无法反推后缀起点或被文件末尾截短的终点。没有后缀请求时，
             // 仍要求实际端点落在请求区间内；允许区间合并时覆盖两段之间的间隙。
-            var absolute = _requested.Where(item => item.From.HasValue).ToArray();
-            var suffix = _requested.Any(item => !item.From.HasValue);
+            RangeItemHeaderValue[] absolute = _requested.Where(item => item.From.HasValue).ToArray();
+            bool suffix = _requested.Any(item => !item.From.HasValue);
             if (!suffix && (!absolute.Any(item => from >= item.From && (!item.To.HasValue || from <= item.To))
                 || !absolute.Any(item => to >= item.From && (!item.To.HasValue || to <= item.To))))
                 throw new InvalidDataException("The returned interval lies outside the requested byte ranges.");
@@ -80,13 +89,13 @@ internal sealed class ByteRangeRequestValidator
     /// <returns>已验证的包含式起止位置。</returns>
     public static (long From, long To) GetInterval(ContentRangeHeaderValue? range, long? contentLength)
     {
-        if (range is null || !range.Unit.Equals("bytes", StringComparison.OrdinalIgnoreCase) || !range.HasRange
+        return range is null || !range.Unit.Equals("bytes", StringComparison.OrdinalIgnoreCase) || !range.HasRange
             || range.From is not { } from || range.To is not { } to || from < 0 || to < from
-            || to - from == long.MaxValue || (range.HasLength && to >= range.Length))
-            throw new InvalidDataException("Invalid byte Content-Range.");
-        if (contentLength is { } declared && declared != to - from + 1)
-            throw new InvalidDataException("Content-Length disagrees with Content-Range.");
-        return (from, to);
+            || to - from == long.MaxValue || (range.HasLength && to >= range.Length)
+            ? throw new InvalidDataException("Invalid byte Content-Range.")
+            : contentLength is { } declared && declared != to - from + 1
+            ? throw new InvalidDataException("Content-Length disagrees with Content-Range.")
+            : ((long From, long To))(from, to);
     }
 
     /// <summary>完整读完响应后复核全部区间，并计算尚未返回的可满足请求区间。</summary>
@@ -97,27 +106,33 @@ internal sealed class ByteRangeRequestValidator
             throw new InvalidDataException("A partial response contained no range parts.");
         if (TotalLength is not { } total)
             return;
-        var expectedRanges = Normalize(total);
+        (long From, long To)[] expectedRanges = Normalize(total);
         // 最早的分段可能使用 */ 未声明总长度，后续分段才给出总长度，因此在此统一复核。
-        foreach (var actual in _received)
+        foreach ((long From, long To) actual in _received)
             ValidateKnownInterval(actual, expectedRanges);
-        var received = Merge(_received);
+        (long From, long To)[] received = Merge(_received);
         List<RangeItemHeaderValue> missing = [];
-        foreach (var expected in Merge(expectedRanges))
+        foreach ((long From, long To) in Merge(expectedRanges))
         {
-            var next = expected.From;
-            var covered = false;
-            foreach (var actual in received)
+            long next = From;
+            bool covered = false;
+            foreach ((long From, long To) actual in received)
             {
-                if (actual.To < next) continue;
-                if (actual.From > expected.To) break;
+                if (actual.To < next)
+                    continue;
+                if (actual.From > To)
+                    break;
                 if (actual.From > next)
                     missing.Add(new RangeItemHeaderValue(next, actual.From - 1));
-                if (actual.To >= expected.To) { covered = true; break; }
+                if (actual.To >= To)
+                {
+                    covered = true;
+                    break;
+                }
                 next = actual.To + 1;
             }
             if (!covered)
-                missing.Add(new RangeItemHeaderValue(next, expected.To));
+                missing.Add(new RangeItemHeaderValue(next, To));
         }
         MissingRanges = Array.AsReadOnly(missing.ToArray());
     }
@@ -140,7 +155,7 @@ internal sealed class ByteRangeRequestValidator
     private static (long From, long To)[] Merge(IEnumerable<(long From, long To)> ranges)
     {
         List<(long From, long To)> merged = [];
-        foreach (var range in ranges.OrderBy(item => item.From))
+        foreach ((long From, long To) range in ranges.OrderBy(item => item.From))
         {
             // 已知总长度最多为 Int64.MaxValue，因此有效终点最多是 MaxValue - 1。
             if (merged.Count == 0 || range.From > merged[^1].To + 1)
@@ -156,13 +171,15 @@ internal sealed class ByteRangeRequestValidator
     /// <returns>已截断到文件末尾的有效区间元数据。</returns>
     private (long From, long To)[] Normalize(long total)
     {
-        if (total <= 0) return [];
+        if (total <= 0)
+            return [];
         List<(long From, long To)> result = [];
-        foreach (var item in _requested)
+        foreach (RangeItemHeaderValue item in _requested)
         {
             if (item.From is { } start)
             {
-                if (start < total) result.Add((start, Math.Min(item.To ?? total - 1, total - 1)));
+                if (start < total)
+                    result.Add((start, Math.Min(item.To ?? (total - 1), total - 1)));
             }
             else if (item.To is > 0)
                 result.Add((Math.Max(0, total - item.To.Value), total - 1));

@@ -21,12 +21,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
-using MonsterSyncDrive.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>管理单次 GET 返回的多范围流、单段合并响应或忽略 Range 的完整正文。</summary>
 /// <remarks>必须使用 using 或 await using。分段只允许顺序消费，完整枚举后才完成覆盖范围计算、终止边界和外层长度校验。</remarks>
@@ -68,11 +68,11 @@ public sealed class WebDavRangeResponse : WebDavResponse, IDisposable, IAsyncDis
         _requestToken = requestToken;
         _validator = new ByteRangeRequestValidator(requested);
         RequestedRange = requested.ToString();
-        CaptureHeaders<WebDavRangeResponse>(response);
+        _ = CaptureHeaders<WebDavRangeResponse>(response);
         _outerLength = response.Content.Headers.ContentLength;
         if (response.StatusCode == HttpStatusCode.PartialContent)
         {
-            var type = response.Content.Headers.ContentType;
+            MediaTypeHeaderValue? type = response.Content.Headers.ContentType;
             if (type?.MediaType?.Equals("multipart/byteranges", StringComparison.OrdinalIgnoreCase) == true)
             {
                 if (requested.Ranges.Count < 2)
@@ -87,13 +87,17 @@ public sealed class WebDavRangeResponse : WebDavResponse, IDisposable, IAsyncDis
                 _singleLength = _validator.Add(_singleRange, _outerLength);
             }
         }
-        else _singleLength = _outerLength;
+        else
+            _singleLength = _outerLength;
         _lifetime = new CancellationTokenSource();
         _lifetimeToken = _lifetime.Token;
     }
 
     /// <summary>获取发送时的 Range 请求头快照。</summary>
-    public string RequestedRange { get; }
+    public string RequestedRange
+    {
+        get;
+    }
     /// <summary>获取服务器是否返回 multipart/byteranges 格式。</summary>
     public bool IsMultipart => _boundary is not null;
     /// <summary>获取服务器是否忽略 Range 并返回完整 200 正文。</summary>
@@ -118,20 +122,20 @@ public sealed class WebDavRangeResponse : WebDavResponse, IDisposable, IAsyncDis
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         if (Interlocked.Exchange(ref _started, 1) != 0)
             throw new InvalidOperationException("A byte-range response can only be enumerated once.");
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(_requestToken, _lifetimeToken, cancellationToken);
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(_requestToken, _lifetimeToken, cancellationToken);
         try
         {
-            using var abort = linked.Token.UnsafeRegister(static value => ((HttpResponseMessage)value!).Dispose(), _response);
+            using CancellationTokenRegistration abort = linked.Token.UnsafeRegister(static value => ((HttpResponseMessage)value!).Dispose(), _response);
             linked.Token.ThrowIfCancellationRequested();
-            EnsureSuccessStatusCode();
+            _ = EnsureSuccessStatusCode();
             if (StatusCode is not (200 or 206))
                 throw new InvalidDataException("A range GET must return 200 or 206 to provide readable representation bytes.");
-            await using var source = await _response.Content.ReadAsStreamAsync(linked.Token).ConfigureAwait(false);
-            var reader = new MultipartByteRangeReader(source);
+            await using Stream source = await _response.Content.ReadAsStreamAsync(linked.Token).ConfigureAwait(false);
+            MultipartByteRangeReader reader = new(source);
             if (_boundary is null)
             {
-                var headers = _response.Content.Headers.ToDictionary(header => header.Key, header => header.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
-                using var segment = new ByteRangePartStream(reader, _singleLength, linked.Token, Dispose);
+                Dictionary<string, string[]> headers = _response.Content.Headers.ToDictionary(header => header.Key, header => header.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
+                using ByteRangePartStream segment = new(reader, _singleLength, linked.Token, Dispose);
                 yield return new WebDavRangePart(_singleRange, headers, segment);
                 await segment.DrainAsync(linked.Token).ConfigureAwait(false);
                 // 长度已知的段停止在边界处，额外探测确保测试流或非标准处理器没有偷塞更多正文。
@@ -144,42 +148,61 @@ public sealed class WebDavRangeResponse : WebDavResponse, IDisposable, IAsyncDis
                     throw new InvalidDataException("A multipart partial response cannot be empty.");
                 while (true)
                 {
-                    var headers = await reader.ReadHeadersAsync(linked.Token).ConfigureAwait(false);
+                    IReadOnlyDictionary<string, string[]> headers = await reader.ReadHeadersAsync(linked.Token).ConfigureAwait(false);
                     if (!headers.TryGetValue("Content-Range", out var values) || values.Length != 1
-                        || !ContentRangeHeaderValue.TryParse(values[0], out var range))
+                        || !ContentRangeHeaderValue.TryParse(values[0], out ContentRangeHeaderValue? range))
                         throw new InvalidDataException("A MIME byte-range part has no valid Content-Range.");
                     var length = _validator.Add(range, MultipartByteRangeReader.GetLength(headers));
-                    using var segment = new ByteRangePartStream(reader, length, linked.Token, Dispose);
+                    using ByteRangePartStream segment = new(reader, length, linked.Token, Dispose);
                     // 文件数据按已验证的精确区间长度读取，绝不在二进制负载中搜索边界。
                     yield return new WebDavRangePart(range, headers, segment);
                     await segment.DrainAsync(linked.Token).ConfigureAwait(false);
-                    if (await reader.ReadBoundaryAsync(_boundary, false, linked.Token).ConfigureAwait(false)) break;
+                    if (await reader.ReadBoundaryAsync(_boundary, false, linked.Token).ConfigureAwait(false))
+                        break;
                 }
                 await reader.DrainEpilogueAsync(linked.Token).ConfigureAwait(false);
             }
             if (_outerLength.HasValue && reader.BytesRead != _outerLength)
                 throw new InvalidDataException("The complete response length differs from Content-Length.");
-            if (StatusCode == 206) _validator.Complete();
+            if (StatusCode == 206)
+                _validator.Complete();
             linked.Token.ThrowIfCancellationRequested();
             _completed = true;
         }
-        finally { Dispose(); }
+        finally
+        {
+            Dispose();
+        }
     }
 
     /// <summary>取消在途分段读取，并至多释放一次原始响应及内部令牌源。</summary>
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        try { _lifetime.Cancel(); }
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+        try
+        {
+            _lifetime.Cancel();
+        }
         finally
         {
-            try { _response.Dispose(); }
-            finally { _lifetime.Dispose(); }
+            try
+            {
+                _response.Dispose();
+            }
+            finally
+            {
+                _lifetime.Dispose();
+            }
         }
     }
 
     /// <summary>异步关闭范围结果，当前实现的资源释放在返回前同步完成。</summary>
     /// <returns>已完成的释放任务。</returns>
-    public ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
+    public ValueTask DisposeAsync()
+    {
+        Dispose();
+        return ValueTask.CompletedTask;
+    }
 }
 

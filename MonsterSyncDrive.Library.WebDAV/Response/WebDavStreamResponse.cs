@@ -21,7 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Response;
+using MonsterSyncDrive.Library.WebDAV.Core;
+using System.Net.Http.Headers;
+
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>
 /// 管理 GET 下载流、响应头快照及原始 HTTP 响应的所有权。
@@ -39,22 +42,25 @@ public class WebDavStreamResponse : WebDavResponse, IDisposable, IAsyncDisposabl
         : base((int)response.StatusCode, response.ReasonPhrase)
     {
         ArgumentNullException.ThrowIfNull(stream);
-        CaptureHeaders<WebDavStreamResponse>(response);
-        Stream = new MonsterSyncDrive.WebDAV.Core.WebDavReadStream(stream, CancellationToken.None, response.Dispose);
+        _ = CaptureHeaders<WebDavStreamResponse>(response);
+        Stream = new WebDavReadStream(stream, CancellationToken.None, response.Dispose);
     }
 
     /// <summary>
     /// 获取只读下载流，关闭此流也会释放其 HTTP 响应。
     /// </summary>
     /// <value>响应支持 using 或 await using；网络流通常不可定位，不应假定支持 Length 或 Seek。</value>
-    public Stream Stream { get; }
+    public Stream Stream
+    {
+        get;
+    }
 
     /// <summary>
     /// 获取响应头声明的正文长度，单位为字节。
     /// </summary>
     /// <value>未提供或不能解析时为 null；206 时通常表示本段长度，不是整个文件长度。</value>
     public long? ContentLength => long.TryParse(GetHeader("Content-Length"), System.Globalization.NumberStyles.None,
-        System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : null;
+        System.Globalization.CultureInfo.InvariantCulture, out long value) ? value : null;
     /// <summary>
     /// 获取响应正文的 Content-Type 头文本。
     /// </summary>
@@ -65,13 +71,16 @@ public class WebDavStreamResponse : WebDavResponse, IDisposable, IAsyncDisposabl
     /// </summary>
     /// <value>未提供或无法解析时为 null；支持读取本段起止位置和服务器声明的总长度。</value>
     public System.Net.Http.Headers.ContentRangeHeaderValue? ContentRange =>
-        System.Net.Http.Headers.ContentRangeHeaderValue.TryParse(GetHeader("Content-Range"), out var value) ? value : null;
+        System.Net.Http.Headers.ContentRangeHeaderValue.TryParse(GetHeader("Content-Range"), out ContentRangeHeaderValue? value) ? value : null;
 
     /// <summary>
     /// 返回当前WebDavStreamResponse的状态或属性概要，便于日志记录和调试。
     /// </summary>
     /// <returns>包含当前对象关键字段的描述字符串，不触发网络请求。</returns>
-    public override string ToString() => $"WebDAV stream response - StatusCode: {StatusCode}, Description: {Description}";
+    public override string ToString()
+    {
+        return $"WebDAV stream response - StatusCode: {StatusCode}, Description: {Description}";
+    }
 
     /// <summary>
     /// 关闭下载流及原始 HTTP 响应，归还连接和关联的请求生命周期资源。
@@ -87,5 +96,9 @@ public class WebDavStreamResponse : WebDavResponse, IDisposable, IAsyncDisposabl
     /// 通过现有同步清理路径释放下载结果和网络资源。
     /// </summary>
     /// <returns>已经完成的 ValueTask，返回前资源已执行释放。</returns>
-    public ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
+    public ValueTask DisposeAsync()
+    {
+        Dispose();
+        return ValueTask.CompletedTask;
+    }
 }

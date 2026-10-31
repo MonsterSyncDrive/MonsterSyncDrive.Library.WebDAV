@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>
 /// 保存 DELETE、COPY、MOVE 等修改操作的多资源响应。
@@ -44,5 +44,5 @@ public class WebDavMultiStatusResponse(int statusCode, string? description, IRea
     /// 获取 HTTP 为 2xx 且所有内部资源及属性状态均成功的结果。
     /// </summary>
     public override bool IsSuccessful => base.IsSuccessful && Resources.All(resource =>
-        (resource.StatusCode is null or >= 200 and < 300) && resource.PropertyStatuses.All(status => status.IsSuccessful));
+        (resource.StatusCode is null or (>= 200 and < 300)) && resource.PropertyStatuses.All(status => status.IsSuccessful));
 }

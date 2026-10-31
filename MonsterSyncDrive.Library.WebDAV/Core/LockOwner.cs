@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 表示写锁所有者信息的抽象基类。
@@ -34,11 +34,17 @@ public abstract class LockOwner
     /// <summary>
     /// 获取写入锁所有者元素的文本或绝对 URI。
     /// </summary>
-    public abstract string Value { get; }
+    public abstract string Value
+    {
+        get;
+    }
 
     /// <summary>生成可写入 LOCK 请求的完整所有者 XML。</summary>
     /// <returns>普通所有者使用文本，URI 所有者使用 DAV:href，结构化派生类型可重写此方法。</returns>
-    public virtual XElement ToXElement() => this is UriLockOwner
+    public virtual XElement ToXElement()
+    {
+        return this is UriLockOwner
         ? new XElement(WebDavXml.Dav + "owner", new XElement(WebDavXml.Dav + "href", Value))
         : new XElement(WebDavXml.Dav + "owner", Value);
+    }
 }

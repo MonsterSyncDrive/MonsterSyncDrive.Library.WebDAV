@@ -21,8 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Request;
-using MonsterSyncDrive.WebDAV.Response;
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Request;
+using MonsterSyncDrive.Library.WebDAV.Response;
 
 namespace MonsterSyncDrive.WebDAV;
 
@@ -36,7 +37,10 @@ public partial interface IWebDavClient : IDisposable
     /// 获取解析相对请求 URI 使用的 HTTP 基地址。
     /// </summary>
     /// <value>未配置时为 null，只能发送绝对请求 URI；相对地址按标准 URI 规则解析。</value>
-    public Uri? BaseAddress { get; }
+    Uri? BaseAddress
+    {
+        get;
+    }
     /// <summary>
     /// 异步发送原始 HTTP 或 DAV 扩展请求，将请求取消延续到响应正文。
     /// </summary>
@@ -46,7 +50,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>响应头到达后完成的任务；调用方拥有返回的 HTTP 响应及传入的请求，两者均须释放。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default);
+    Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default);
     /// <summary>
     /// 异步发送 HEAD，仅取得状态和响应头，不下载文件正文。
     /// </summary>
@@ -56,7 +60,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>包含状态码及响应头快照的异步结果，原始 HTTP 响应已释放。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> HeadAsync(string requestUri, WebDavRequestOptions? options = null);
+    Task<WebDavResponse> HeadAsync(string requestUri, WebDavRequestOptions? options = null);
     /// <summary>
     /// 异步发送 HEAD，仅取得状态和响应头，不下载文件正文。
     /// </summary>
@@ -66,7 +70,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>包含状态码及响应头快照的异步结果，原始 HTTP 响应已释放。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> HeadAsync(Uri requestUri, WebDavRequestOptions? options = null);
+    Task<WebDavResponse> HeadAsync(Uri requestUri, WebDavRequestOptions? options = null);
     /// <summary>
     /// 异步发送 OPTIONS，查询当前资源声明的 DAV 能力及允许方法。
     /// </summary>
@@ -76,7 +80,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>包含 HTTP 状态、DAV 合规标识和 Allow 方法列表的异步结果。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<OptionsResponse> OptionsAsync(string requestUri, WebDavRequestOptions? options = null);
+    Task<OptionsResponse> OptionsAsync(string requestUri, WebDavRequestOptions? options = null);
     /// <summary>
     /// 异步发送 OPTIONS，查询当前资源声明的 DAV 能力及允许方法。
     /// </summary>
@@ -86,7 +90,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>包含 HTTP 状态、DAV 合规标识和 Allow 方法列表的异步结果。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<OptionsResponse> OptionsAsync(Uri requestUri, WebDavRequestOptions? options = null);
+    Task<OptionsResponse> OptionsAsync(Uri requestUri, WebDavRequestOptions? options = null);
     /// <summary>
     /// 异步通过 HEAD 判断资源是否存在，仅将 HTTP 404 解释为不存在。
     /// </summary>
@@ -96,7 +100,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>HEAD 为 2xx 时返回 true，404 时返回 false；其余非成功状态抛出 HttpRequestException。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">HEAD 返回除 404 以外的非成功状态，或发生网络传输失败。</exception>
-    public Task<bool> ExistsAsync(string requestUri, CancellationToken cancellationToken = default);
+    Task<bool> ExistsAsync(string requestUri, CancellationToken cancellationToken = default);
     /// <summary>
     /// 异步逐条枚举 PROPFIND 资源，避免一次性物化全部目录项。
     /// </summary>
@@ -108,7 +112,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public IAsyncEnumerable<MonsterSyncDrive.WebDAV.Core.WebDavResource> EnumerateAsync(string requestUri,
+    IAsyncEnumerable<WebDavResource> EnumerateAsync(string requestUri,
         PropfindParameters? parameters = null, CancellationToken cancellationToken = default);
     /// <summary>
     /// 异步将成功的原始下载正文复制到调用方目标流，并检查已知长度。
@@ -122,7 +126,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.IOException">正文复制失败，或实际下载字节数与 Content-Length 不符。</exception>
-    public Task<WebDavResponse> DownloadFileAsync(string requestUri, Stream destination,
+    Task<WebDavResponse> DownloadFileAsync(string requestUri, Stream destination,
         GetFileParameters? parameters = null, IProgress<long>? progress = null);
     /// <summary>
     /// 异步发送通用 XML REPORT，保留完整响应根和可用的 DAV:response 资源条目。
@@ -135,7 +139,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<WebDavReportResponse> ReportAsync(string requestUri, System.Xml.Linq.XElement report, WebDavRequestOptions? options = null);
+    Task<WebDavReportResponse> ReportAsync(string requestUri, System.Xml.Linq.XElement report, WebDavRequestOptions? options = null);
     /// <summary>
     /// 异步查询资源的 DAV 属性，完整读取多状态文档后返回资源快照。
     /// </summary>
@@ -145,7 +149,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<PropfindResponse> Propfind(string requestUri);
+    Task<PropfindResponse> Propfind(string requestUri);
 
     /// <summary>
     /// 异步查询资源的 DAV 属性，完整读取多状态文档后返回资源快照。
@@ -156,7 +160,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<PropfindResponse> Propfind(Uri requestUri);
+    Task<PropfindResponse> Propfind(Uri requestUri);
 
     /// <summary>
     /// 异步查询资源的 DAV 属性，完整读取多状态文档后返回资源快照。
@@ -168,7 +172,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<PropfindResponse> Propfind(string requestUri, PropfindParameters parameters);
+    Task<PropfindResponse> Propfind(string requestUri, PropfindParameters parameters);
 
     /// <summary>
     /// 异步查询资源的 DAV 属性，完整读取多状态文档后返回资源快照。
@@ -180,7 +184,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<PropfindResponse> Propfind(Uri requestUri, PropfindParameters parameters);
+    Task<PropfindResponse> Propfind(Uri requestUri, PropfindParameters parameters);
 
     /// <summary>
     /// 异步设置或删除资源属性，并检查服务器是否确认全部请求属性。
@@ -192,7 +196,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<ProppatchResponse> Proppatch(string requestUri, ProppatchParameters parameters);
+    Task<ProppatchResponse> Proppatch(string requestUri, ProppatchParameters parameters);
 
     /// <summary>
     /// 异步设置或删除资源属性，并检查服务器是否确认全部请求属性。
@@ -204,7 +208,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<ProppatchResponse> Proppatch(Uri requestUri, ProppatchParameters parameters);
+    Task<ProppatchResponse> Proppatch(Uri requestUri, ProppatchParameters parameters);
 
     /// <summary>
     /// 异步在指定 URI 创建 WebDAV 集合。
@@ -214,7 +218,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步创建任务；结果包含 HTTP 状态及可能的多状态资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Mkcol(string requestUri);
+    Task<WebDavResponse> Mkcol(string requestUri);
 
     /// <summary>
     /// 异步在指定 URI 创建 WebDAV 集合。
@@ -224,18 +228,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步创建任务；结果包含 HTTP 状态及可能的多状态资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Mkcol(Uri requestUri);
-
-    /// <summary>
-    /// 异步在指定 URI 创建 WebDAV 集合。
-    /// </summary>
-    /// <remarks>只创建指定集合，不递归创建父目录；目标存在或父目录缺失时由服务器返回对应状态。</remarks>
-    /// <param name="requestUri">请求资源的标准 URI 引用，可为绝对地址或相对 BaseAddress 的已编码路径；普通文件名可先用 WebDavUri.EncodePath 编码。</param>
-    /// <param name="parameters">本次 Mkcol 操作的请求参数，包括通用 HTTP 条件、请求头及取消设置。 不应为 null。</param>
-    /// <returns>异步创建任务；结果包含 HTTP 状态及可能的多状态资源错误。</returns>
-    /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
-    /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Mkcol(string requestUri, MkColParameters parameters);
+    Task<WebDavResponse> Mkcol(Uri requestUri);
 
     /// <summary>
     /// 异步在指定 URI 创建 WebDAV 集合。
@@ -246,7 +239,18 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步创建任务；结果包含 HTTP 状态及可能的多状态资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Mkcol(Uri requestUri, MkColParameters parameters);
+    Task<WebDavResponse> Mkcol(string requestUri, MkColParameters parameters);
+
+    /// <summary>
+    /// 异步在指定 URI 创建 WebDAV 集合。
+    /// </summary>
+    /// <remarks>只创建指定集合，不递归创建父目录；目标存在或父目录缺失时由服务器返回对应状态。</remarks>
+    /// <param name="requestUri">请求资源的标准 URI 引用，可为绝对地址或相对 BaseAddress 的已编码路径；普通文件名可先用 WebDavUri.EncodePath 编码。</param>
+    /// <param name="parameters">本次 Mkcol 操作的请求参数，包括通用 HTTP 条件、请求头及取消设置。 不应为 null。</param>
+    /// <returns>异步创建任务；结果包含 HTTP 状态及可能的多状态资源错误。</returns>
+    /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
+    /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
+    Task<WebDavResponse> Mkcol(Uri requestUri, MkColParameters parameters);
 
     /// <summary>
     /// 异步打开原始文件正文流，支持单段字节范围与 HTTP 版本条件。
@@ -257,7 +261,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetRawFile(string requestUri);
+    Task<WebDavStreamResponse> GetRawFile(string requestUri);
 
     /// <summary>
     /// 异步打开原始文件正文流，支持单段字节范围与 HTTP 版本条件。
@@ -268,7 +272,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetRawFile(Uri requestUri);
+    Task<WebDavStreamResponse> GetRawFile(Uri requestUri);
 
     /// <summary>
     /// 异步打开原始文件正文流，支持单段字节范围与 HTTP 版本条件。
@@ -280,7 +284,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetRawFile(string requestUri, GetFileParameters parameters);
+    Task<WebDavStreamResponse> GetRawFile(string requestUri, GetFileParameters parameters);
 
     /// <summary>
     /// 异步打开原始文件正文流，支持单段字节范围与 HTTP 版本条件。
@@ -292,7 +296,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetRawFile(Uri requestUri, GetFileParameters parameters);
+    Task<WebDavStreamResponse> GetRawFile(Uri requestUri, GetFileParameters parameters);
 
     /// <summary>
     /// 异步请求可由服务器处理后的文件正文，并保留流式响应。
@@ -303,7 +307,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetProcessedFile(string requestUri);
+    Task<WebDavStreamResponse> GetProcessedFile(string requestUri);
 
     /// <summary>
     /// 异步请求可由服务器处理后的文件正文，并保留流式响应。
@@ -314,19 +318,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetProcessedFile(Uri requestUri);
-
-    /// <summary>
-    /// 异步请求可由服务器处理后的文件正文，并保留流式响应。
-    /// </summary>
-    /// <remarks>Translate: t 仅提示服务器允许处理，实际语义由服务器决定；方法不会等待或缓冲整个文件正文。</remarks>
-    /// <param name="requestUri">请求资源的标准 URI 引用，可为绝对地址或相对 BaseAddress 的已编码路径；普通文件名可先用 WebDavUri.EncodePath 编码。</param>
-    /// <param name="parameters">本次 GetProcessedFile 操作的请求参数，包括通用 HTTP 条件、请求头及取消设置。 不应为 null。</param>
-    /// <returns>包含下载流及响应头的异步结果，调用方需检查 HTTP 状态并及时释放。</returns>
-    /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
-    /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetProcessedFile(string requestUri, GetFileParameters parameters);
+    Task<WebDavStreamResponse> GetProcessedFile(Uri requestUri);
 
     /// <summary>
     /// 异步请求可由服务器处理后的文件正文，并保留流式响应。
@@ -338,7 +330,19 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<WebDavStreamResponse> GetProcessedFile(Uri requestUri, GetFileParameters parameters);
+    Task<WebDavStreamResponse> GetProcessedFile(string requestUri, GetFileParameters parameters);
+
+    /// <summary>
+    /// 异步请求可由服务器处理后的文件正文，并保留流式响应。
+    /// </summary>
+    /// <remarks>Translate: t 仅提示服务器允许处理，实际语义由服务器决定；方法不会等待或缓冲整个文件正文。</remarks>
+    /// <param name="requestUri">请求资源的标准 URI 引用，可为绝对地址或相对 BaseAddress 的已编码路径；普通文件名可先用 WebDavUri.EncodePath 编码。</param>
+    /// <param name="parameters">本次 GetProcessedFile 操作的请求参数，包括通用 HTTP 条件、请求头及取消设置。 不应为 null。</param>
+    /// <returns>包含下载流及响应头的异步结果，调用方需检查 HTTP 状态并及时释放。</returns>
+    /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
+    /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
+    /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
+    Task<WebDavStreamResponse> GetProcessedFile(Uri requestUri, GetFileParameters parameters);
 
     /// <summary>
     /// 异步发送 GET 并校验正文编码及分段范围，返回原始 HTTP 响应。
@@ -351,7 +355,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">分段范围不合法，或原始文件响应包含不允许的内容编码。</exception>
-    public Task<HttpResponseMessage> GetFileResponse(Uri requestUri, bool translate, GetFileParameters parameters);
+    Task<HttpResponseMessage> GetFileResponse(Uri requestUri, bool translate, GetFileParameters parameters);
 
     /// <summary>
     /// 异步删除文件或集合，保留集合内部资源的删除失败结果。
@@ -361,7 +365,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步删除任务；HTTP 207 时结果为 WebDavMultiStatusResponse，内部失败可通过 IsSuccessful 发现。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Delete(string requestUri);
+    Task<WebDavResponse> Delete(string requestUri);
 
     /// <summary>
     /// 异步删除文件或集合，保留集合内部资源的删除失败结果。
@@ -371,18 +375,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步删除任务；HTTP 207 时结果为 WebDavMultiStatusResponse，内部失败可通过 IsSuccessful 发现。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Delete(Uri requestUri);
-
-    /// <summary>
-    /// 异步删除文件或集合，保留集合内部资源的删除失败结果。
-    /// </summary>
-    /// <remarks>集合删除范围由服务器按协议处理；本库不把 404 自动解释为成功，也不自动重试删除。</remarks>
-    /// <param name="requestUri">请求资源的标准 URI 引用，可为绝对地址或相对 BaseAddress 的已编码路径；普通文件名可先用 WebDavUri.EncodePath 编码。</param>
-    /// <param name="parameters">本次 Delete 操作的请求参数，包括通用 HTTP 条件、请求头及取消设置。 不应为 null。</param>
-    /// <returns>异步删除任务；HTTP 207 时结果为 WebDavMultiStatusResponse，内部失败可通过 IsSuccessful 发现。</returns>
-    /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
-    /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Delete(string requestUri, DeleteParameters parameters);
+    Task<WebDavResponse> Delete(Uri requestUri);
 
     /// <summary>
     /// 异步删除文件或集合，保留集合内部资源的删除失败结果。
@@ -393,7 +386,18 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步删除任务；HTTP 207 时结果为 WebDavMultiStatusResponse，内部失败可通过 IsSuccessful 发现。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Delete(Uri requestUri, DeleteParameters parameters);
+    Task<WebDavResponse> Delete(string requestUri, DeleteParameters parameters);
+
+    /// <summary>
+    /// 异步删除文件或集合，保留集合内部资源的删除失败结果。
+    /// </summary>
+    /// <remarks>集合删除范围由服务器按协议处理；本库不把 404 自动解释为成功，也不自动重试删除。</remarks>
+    /// <param name="requestUri">请求资源的标准 URI 引用，可为绝对地址或相对 BaseAddress 的已编码路径；普通文件名可先用 WebDavUri.EncodePath 编码。</param>
+    /// <param name="parameters">本次 Delete 操作的请求参数，包括通用 HTTP 条件、请求头及取消设置。 不应为 null。</param>
+    /// <returns>异步删除任务；HTTP 207 时结果为 WebDavMultiStatusResponse，内部失败可通过 IsSuccessful 发现。</returns>
+    /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
+    /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
+    Task<WebDavResponse> Delete(Uri requestUri, DeleteParameters parameters);
 
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
@@ -404,7 +408,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(string requestUri, Stream stream);
+    Task<WebDavResponse> PutFile(string requestUri, Stream stream);
 
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
@@ -415,7 +419,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(Uri requestUri, Stream stream);
+    Task<WebDavResponse> PutFile(Uri requestUri, Stream stream);
 
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
@@ -427,7 +431,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(string requestUri, Stream stream, string contentType);
+    Task<WebDavResponse> PutFile(string requestUri, Stream stream, string contentType);
 
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
@@ -439,7 +443,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(Uri requestUri, Stream stream, string contentType);
+    Task<WebDavResponse> PutFile(Uri requestUri, Stream stream, string contentType);
 
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
@@ -451,7 +455,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(string requestUri, Stream stream, PutFileParameters parameters);
+    Task<WebDavResponse> PutFile(string requestUri, Stream stream, PutFileParameters parameters);
 
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
@@ -463,7 +467,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(Uri requestUri, Stream stream, PutFileParameters parameters);
+    Task<WebDavResponse> PutFile(Uri requestUri, Stream stream, PutFileParameters parameters);
 
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
@@ -474,7 +478,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(string requestUri, HttpContent content);
+    Task<WebDavResponse> PutFile(string requestUri, HttpContent content);
 
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
@@ -485,19 +489,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(Uri requestUri, HttpContent content);
-
-    /// <summary>
-    /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
-    /// </summary>
-    /// <remarks>默认按服务器 PUT 语义覆盖目标；仅创建时设置 IfNoneMatch 为 *，按版本覆盖时设置 IfMatch。上传字节进度不代表服务器事务已提交。 传入的 HttpContent 随请求释放；若需保留其内部流，应使用不关闭底层流的正文包装。</remarks>
-    /// <param name="requestUri">请求资源的标准 URI 引用，可为绝对地址或相对 BaseAddress 的已编码路径；普通文件名可先用 WebDavUri.EncodePath 编码。</param>
-    /// <param name="content">要发送的 HTTP 正文；随已构造的 PUT 请求管理和释放，包括正文自身拥有的流。</param>
-    /// <param name="parameters">本次 PutFile 操作的请求参数，包括通用 HTTP 条件、请求头及取消设置。 不应为 null。</param>
-    /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
-    /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
-    /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(string requestUri, HttpContent content, PutFileParameters parameters);
+    Task<WebDavResponse> PutFile(Uri requestUri, HttpContent content);
 
     /// <summary>
     /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
@@ -509,7 +501,19 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> PutFile(Uri requestUri, HttpContent content, PutFileParameters parameters);
+    Task<WebDavResponse> PutFile(string requestUri, HttpContent content, PutFileParameters parameters);
+
+    /// <summary>
+    /// 异步通过 PUT 创建或覆盖文件内容，并返回服务器确认结果。
+    /// </summary>
+    /// <remarks>默认按服务器 PUT 语义覆盖目标；仅创建时设置 IfNoneMatch 为 *，按版本覆盖时设置 IfMatch。上传字节进度不代表服务器事务已提交。 传入的 HttpContent 随请求释放；若需保留其内部流，应使用不关闭底层流的正文包装。</remarks>
+    /// <param name="requestUri">请求资源的标准 URI 引用，可为绝对地址或相对 BaseAddress 的已编码路径；普通文件名可先用 WebDavUri.EncodePath 编码。</param>
+    /// <param name="content">要发送的 HTTP 正文；随已构造的 PUT 请求管理和释放，包括正文自身拥有的流。</param>
+    /// <param name="parameters">本次 PutFile 操作的请求参数，包括通用 HTTP 条件、请求头及取消设置。 不应为 null。</param>
+    /// <returns>异步上传任务；结果保留 HTTP 状态、响应头和可能的逐资源错误。</returns>
+    /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
+    /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
+    Task<WebDavResponse> PutFile(Uri requestUri, HttpContent content, PutFileParameters parameters);
 
     /// <summary>
     /// 异步复制源资源到目标 URI，支持集合深度、覆盖策略及目标锁条件。
@@ -520,7 +524,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步复制任务；多状态响应保留已返回的资源和属性错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Copy(string sourceUri, string destUri);
+    Task<WebDavResponse> Copy(string sourceUri, string destUri);
 
     /// <summary>
     /// 异步复制源资源到目标 URI，支持集合深度、覆盖策略及目标锁条件。
@@ -531,7 +535,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步复制任务；多状态响应保留已返回的资源和属性错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Copy(Uri sourceUri, Uri destUri);
+    Task<WebDavResponse> Copy(Uri sourceUri, Uri destUri);
 
     /// <summary>
     /// 异步复制源资源到目标 URI，支持集合深度、覆盖策略及目标锁条件。
@@ -543,7 +547,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步复制任务；多状态响应保留已返回的资源和属性错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Copy(string sourceUri, string destUri, CopyParameters parameters);
+    Task<WebDavResponse> Copy(string sourceUri, string destUri, CopyParameters parameters);
 
     /// <summary>
     /// 异步复制源资源到目标 URI，支持集合深度、覆盖策略及目标锁条件。
@@ -555,7 +559,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步复制任务；多状态响应保留已返回的资源和属性错误。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Copy(Uri sourceUri, Uri destUri, CopyParameters parameters);
+    Task<WebDavResponse> Copy(Uri sourceUri, Uri destUri, CopyParameters parameters);
 
     /// <summary>
     /// 异步移动源资源到目标 URI，按各自 URI 提交源锁与目标锁。
@@ -566,7 +570,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步移动任务；多状态内部错误会使 IsSuccessful 为 false，不能仅依据 HTTP 207 判断成功。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Move(string sourceUri, string destUri);
+    Task<WebDavResponse> Move(string sourceUri, string destUri);
 
     /// <summary>
     /// 异步移动源资源到目标 URI，按各自 URI 提交源锁与目标锁。
@@ -577,7 +581,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步移动任务；多状态内部错误会使 IsSuccessful 为 false，不能仅依据 HTTP 207 判断成功。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Move(Uri sourceUri, Uri destUri);
+    Task<WebDavResponse> Move(Uri sourceUri, Uri destUri);
 
     /// <summary>
     /// 异步移动源资源到目标 URI，按各自 URI 提交源锁与目标锁。
@@ -589,7 +593,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步移动任务；多状态内部错误会使 IsSuccessful 为 false，不能仅依据 HTTP 207 判断成功。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Move(string sourceUri, string destUri, MoveParameters parameters);
+    Task<WebDavResponse> Move(string sourceUri, string destUri, MoveParameters parameters);
 
     /// <summary>
     /// 异步移动源资源到目标 URI，按各自 URI 提交源锁与目标锁。
@@ -601,7 +605,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步移动任务；多状态内部错误会使 IsSuccessful 为 false，不能仅依据 HTTP 207 判断成功。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Move(Uri sourceUri, Uri destUri, MoveParameters parameters);
+    Task<WebDavResponse> Move(Uri sourceUri, Uri destUri, MoveParameters parameters);
 
     /// <summary>
     /// 异步创建共享或独占写锁，或刷新已有令牌对应的写锁。
@@ -612,7 +616,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<LockResponse> Lock(string requestUri);
+    Task<LockResponse> Lock(string requestUri);
 
     /// <summary>
     /// 异步创建共享或独占写锁，或刷新已有令牌对应的写锁。
@@ -623,7 +627,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<LockResponse> Lock(Uri requestUri);
+    Task<LockResponse> Lock(Uri requestUri);
 
     /// <summary>
     /// 异步创建共享或独占写锁，或刷新已有令牌对应的写锁。
@@ -635,7 +639,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<LockResponse> Lock(string requestUri, LockParameters parameters);
+    Task<LockResponse> Lock(string requestUri, LockParameters parameters);
 
     /// <summary>
     /// 异步创建共享或独占写锁，或刷新已有令牌对应的写锁。
@@ -647,7 +651,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<LockResponse> Lock(Uri requestUri, LockParameters parameters);
+    Task<LockResponse> Lock(Uri requestUri, LockParameters parameters);
 
     /// <summary>
     /// 异步释放指定资源上由锁令牌标识的写锁。
@@ -658,7 +662,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步解锁任务；结果保留服务器 HTTP 状态和响应头。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Unlock(string requestUri, string lockToken);
+    Task<WebDavResponse> Unlock(string requestUri, string lockToken);
 
     /// <summary>
     /// 异步释放指定资源上由锁令牌标识的写锁。
@@ -669,7 +673,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步解锁任务；结果保留服务器 HTTP 状态和响应头。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Unlock(Uri requestUri, string lockToken);
+    Task<WebDavResponse> Unlock(Uri requestUri, string lockToken);
 
     /// <summary>
     /// 异步释放指定资源上由锁令牌标识的写锁。
@@ -680,7 +684,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步解锁任务；结果保留服务器 HTTP 状态和响应头。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Unlock(string requestUri, UnlockParameters parameters);
+    Task<WebDavResponse> Unlock(string requestUri, UnlockParameters parameters);
 
     /// <summary>
     /// 异步释放指定资源上由锁令牌标识的写锁。
@@ -691,7 +695,7 @@ public partial interface IWebDavClient : IDisposable
     /// <returns>异步解锁任务；结果保留服务器 HTTP 状态和响应头。</returns>
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
-    public Task<WebDavResponse> Unlock(Uri requestUri, UnlockParameters parameters);
+    Task<WebDavResponse> Unlock(Uri requestUri, UnlockParameters parameters);
 
     /// <summary>
     /// 异步执行 DAV:basicsearch 单属性 LIKE 检索，并完整读取命中资源。
@@ -703,7 +707,7 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<PropfindResponse> Search(string requestUri, SearchParameters parameters);
+    Task<PropfindResponse> Search(string requestUri, SearchParameters parameters);
 
     /// <summary>
     /// 异步执行 DAV:basicsearch 单属性 LIKE 检索，并完整读取命中资源。
@@ -715,5 +719,5 @@ public partial interface IWebDavClient : IDisposable
     /// <exception cref="OperationCanceledException">调用方取消、客户端释放或请求超时使操作中止。</exception>
     /// <exception cref="HttpRequestException">发生网络连接或 HTTP 传输失败；普通 HTTP 错误状态通常保留在结果中。</exception>
     /// <exception cref="System.IO.InvalidDataException">成功 HTTP 状态不符合 DAV 协议，或响应缺少必需结构及确认信息。</exception>
-    public Task<PropfindResponse> Search(Uri requestUri, SearchParameters parameters);
+    Task<PropfindResponse> Search(Uri requestUri, SearchParameters parameters);
 }

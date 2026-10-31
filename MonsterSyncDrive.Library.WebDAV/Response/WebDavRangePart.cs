@@ -23,7 +23,7 @@
  */
 using System.Net.Http.Headers;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>描述多范围响应中的一个实际分段，或服务器忽略 Range 后返回的完整正文。</summary>
 /// <remarks>分段流只在当前枚举位置有效；推进至下一段时自动排空未读部分并关闭旧段，不能并发消费不同分段。</remarks>
@@ -41,20 +41,29 @@ public sealed class WebDavRangePart
     }
 
     /// <summary>获取实际返回的字节区间，终点包含在区间内；完整正文回退时为 null。</summary>
-    public ContentRangeHeaderValue? ContentRange { get; }
+    public ContentRangeHeaderValue? ContentRange
+    {
+        get;
+    }
 
     /// <summary>获取分段头快照；非 multipart 结果使用外层正文头。</summary>
-    public IReadOnlyDictionary<string, string[]> Headers { get; }
+    public IReadOnlyDictionary<string, string[]> Headers
+    {
+        get;
+    }
 
     /// <summary>获取当前分段的只读流，不能越过本段读取下一段的 MIME 头。</summary>
-    public Stream Stream { get; }
+    public Stream Stream
+    {
+        get;
+    }
 
     /// <summary>获取本段声明的正文媒体类型，未声明时为 null。</summary>
-    public string? ContentType => Headers.TryGetValue("Content-Type", out var values) ? string.Join(", ", values) : null;
+    public string? ContentType => Headers.TryGetValue("Content-Type", out string[]? values) ? string.Join(", ", values) : null;
 
     /// <summary>获取由 Content-Range 推导的本段长度，完整正文则读取其 Content-Length。</summary>
     public long? ContentLength => ContentRange?.HasRange == true ? ContentRange.To!.Value - ContentRange.From!.Value + 1
-        : Headers.TryGetValue("Content-Length", out var values) && long.TryParse(values.SingleOrDefault(),
-            System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var length) ? length : null;
+        : Headers.TryGetValue("Content-Length", out string[]? values) && long.TryParse(values.SingleOrDefault(),
+            System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long length) ? length : null;
 }
 

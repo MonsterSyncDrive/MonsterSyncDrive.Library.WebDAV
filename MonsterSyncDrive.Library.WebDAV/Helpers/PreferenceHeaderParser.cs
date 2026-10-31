@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Helpers;
+namespace MonsterSyncDrive.Library.WebDAV.Helpers;
 
 /// <summary>解析带引号、转义和参数的 HTTP 偏好及媒体类型字段，避免按裸逗号错误切分。</summary>
 internal static class PreferenceHeaderParser
@@ -35,24 +35,37 @@ internal static class PreferenceHeaderParser
     {
         ArgumentNullException.ThrowIfNull(text);
         List<string> result = [];
-        var quoted = false;
-        var escaped = false;
-        var start = 0;
-        for (var index = 0; index < text.Length; index++)
+        bool quoted = false;
+        bool escaped = false;
+        int start = 0;
+        for (int index = 0; index < text.Length; index++)
         {
-            var value = text[index];
+            char value = text[index];
             if (value is '\r' or '\n' or '\0' || (char.IsControl(value) && value != '\t'))
                 throw new FormatException("Control characters are not allowed in an HTTP field.");
-            if (escaped) { escaped = false; continue; }
-            if (quoted && value == '\\') { escaped = true; continue; }
-            if (value == '"') { quoted = !quoted; continue; }
+            if (escaped)
+            {
+                escaped = false;
+                continue;
+            }
+            if (quoted && value == '\\')
+            {
+                escaped = true;
+                continue;
+            }
+            if (value == '"')
+            {
+                quoted = !quoted;
+                continue;
+            }
             if (!quoted && value == separator)
             {
                 Add(text[start..index]);
                 start = index + 1;
             }
         }
-        if (quoted || escaped) throw new FormatException("Unterminated quoted HTTP field value.");
+        if (quoted || escaped)
+            throw new FormatException("Unterminated quoted HTTP field value.");
         Add(text[start..]);
         return result.AsReadOnly();
 
@@ -61,7 +74,8 @@ internal static class PreferenceHeaderParser
         {
             if (string.IsNullOrWhiteSpace(item))
             {
-                if (allowEmptyItems) return;
+                if (allowEmptyItems)
+                    return;
                 throw new FormatException("An HTTP list item is empty.");
             }
             result.Add(item.Trim());
@@ -73,11 +87,13 @@ internal static class PreferenceHeaderParser
     /// <returns>偏好名称、解码值及可供往返保存的参数后缀。</returns>
     internal static (string Name, string? Value, string Parameters) ParseItem(string item)
     {
-        if (Split(item, ',').Count != 1) throw new FormatException("Expected exactly one preference.");
-        var parts = Split(item, ';');
-        var first = ParsePair(parts[0]);
-        foreach (var part in parts.Skip(1)) _ = ParsePair(part);
-        return (first.Name, first.Value, parts.Count == 1 ? "" : "; " + string.Join("; ", parts.Skip(1)));
+        if (Split(item, ',').Count != 1)
+            throw new FormatException("Expected exactly one preference.");
+        IReadOnlyList<string> parts = Split(item, ';');
+        (string? Name, string? Value) = ParsePair(parts[0]);
+        foreach (string? part in parts.Skip(1))
+            _ = ParsePair(part);
+        return (Name, Value, parts.Count == 1 ? "" : "; " + string.Join("; ", parts.Skip(1)));
     }
 
     /// <summary>解析 token 或 token=value；引号值支持 quoted-pair。</summary>
@@ -85,35 +101,42 @@ internal static class PreferenceHeaderParser
     /// <returns>名称与去引号后的值。</returns>
     private static (string Name, string? Value) ParsePair(string pair)
     {
-        var equal = pair.IndexOf('=');
-        var name = (equal < 0 ? pair : pair[..equal]).Trim();
-        if (!IsToken(name)) throw new FormatException("Invalid preference token.");
-        if (equal < 0) return (name, null);
-        var value = pair[(equal + 1)..].Trim();
+        int equal = pair.IndexOf('=');
+        string name = (equal < 0 ? pair : pair[..equal]).Trim();
+        if (!IsToken(name))
+            throw new FormatException("Invalid preference token.");
+        if (equal < 0)
+            return (name, null);
+        string value = pair[(equal + 1)..].Trim();
         if (value.StartsWith('"'))
         {
-            if (value.Length < 2 || !value.EndsWith('"')) throw new FormatException("Invalid quoted preference value.");
+            if (value.Length < 2 || !value.EndsWith('"'))
+                throw new FormatException("Invalid quoted preference value.");
             var decoded = new System.Text.StringBuilder();
-            for (var index = 1; index < value.Length - 1; index++)
+            for (int index = 1; index < value.Length - 1; index++)
             {
-                var character = value[index];
+                char character = value[index];
                 if (character == '\\')
                 {
-                    if (++index >= value.Length - 1) throw new FormatException("Invalid quoted-pair.");
+                    if (++index >= value.Length - 1)
+                        throw new FormatException("Invalid quoted-pair.");
                     character = value[index];
                 }
-                else if (character == '"') throw new FormatException("Unescaped quote in preference value.");
-                decoded.Append(character);
+                else if (character == '"')
+                    throw new FormatException("Unescaped quote in preference value.");
+                _ = decoded.Append(character);
             }
             return (name, decoded.ToString());
         }
-        if (!IsToken(value)) throw new FormatException("Invalid preference value.");
-        return (name, value);
+        return !IsToken(value) ? throw new FormatException("Invalid preference value.") : ((string Name, string? Value))(name, value);
     }
 
     /// <summary>判断字符串是否全部由 HTTP token 的 ASCII 字符组成。</summary>
     /// <param name="text">待检查名称或值。</param>
     /// <returns>非空且每个字符均合法时为 true。</returns>
-    private static bool IsToken(string text) => text.Length > 0 && text.All(character =>
+    private static bool IsToken(string text)
+    {
+        return text.Length > 0 && text.All(character =>
         char.IsAsciiLetterOrDigit(character) || "!#$%&'*+-.^_`|~".Contains(character));
+    }
 }

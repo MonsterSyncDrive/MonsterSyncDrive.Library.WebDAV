@@ -22,9 +22,8 @@
  * SOFTWARE.
  */
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request.Bindings;
 
 /// <summary>配置 BIND 或 REBIND，改变集合成员绑定，不复制资源内容。</summary>
 public sealed class BindingParameters : WebDavRequestOptions
@@ -32,7 +31,10 @@ public sealed class BindingParameters : WebDavRequestOptions
     /// <summary>获取或设置未转义的单个绑定名称；发送时按 URI 路径段编码，不得包含斜杠、点段或控制字符。</summary>
     public string Segment { get; set; } = "";
     /// <summary>获取或设置已存在资源的 URI；BIND 添加别名，REBIND 将此源绑定移动到新名称。</summary>
-    public Uri? Source { get; set; }
+    public Uri? Source
+    {
+        get; set;
+    }
     /// <summary>获取或设置目标绑定存在时是否覆盖，默认 true；资源身份由服务器维护。</summary>
     public bool Overwrite { get; set; } = true;
     /// <summary>获取或设置附加在标准正文后的扩展元素，发送时深复制。</summary>
@@ -44,9 +46,9 @@ public sealed class BindingParameters : WebDavRequestOptions
     internal static string EncodeSegment(string segment)
     {
         ArgumentException.ThrowIfNullOrEmpty(segment);
-        if (segment is "." or ".." || segment.Contains('/') || segment.Any(char.IsControl))
-            throw new ArgumentException("A binding name must be one non-dot URI path segment.", nameof(segment));
-        return Uri.EscapeDataString(segment);
+        return segment is "." or ".." || segment.Contains('/') || segment.Any(char.IsControl)
+            ? throw new ArgumentException("A binding name must be one non-dot URI path segment.", nameof(segment))
+            : Uri.EscapeDataString(segment);
     }
 }
 

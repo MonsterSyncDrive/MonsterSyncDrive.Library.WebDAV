@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core.Versioning;
 
 /// <summary>提供 DeltaV、绑定和重定向引用共用的安全 XML 构造与属性读取。</summary>
 internal static class VersioningXml
@@ -45,28 +45,36 @@ internal static class VersioningXml
     /// <param name="name">DAV 容器本地名称。</param>
     /// <param name="uris">要列出的 URI 集合。</param>
     /// <returns>包含各个 href 的容器元素。</returns>
-    public static XElement Hrefs(string name, IEnumerable<Uri> uris) =>
-        new(WebDavXml.Dav + name, uris.Select(Href));
+    public static XElement Hrefs(string name, IEnumerable<Uri> uris)
+    {
+        return new(WebDavXml.Dav + name, uris.Select(Href));
+    }
 
     /// <summary>生成指定属性名称列表；空列表仍保留空 prop，避免变成隐式 allprop。</summary>
     /// <param name="properties">需要查询的完整属性名称。</param>
     /// <returns>DAV:prop 元素。</returns>
-    public static XElement Prop(IEnumerable<XName> properties) =>
-        new(WebDavXml.Dav + "prop", properties.Select(name => new XElement(name)));
+    public static XElement Prop(IEnumerable<XName> properties)
+    {
+        return new(WebDavXml.Dav + "prop", properties.Select(name => new XElement(name)));
+    }
 
     /// <summary>从资源的成功属性中取出完整属性元素副本。</summary>
     /// <param name="resource">资源快照。</param>
     /// <param name="localName">DAV 属性本地名称。</param>
     /// <returns>完整属性元素，未成功返回时为 null。</returns>
-    public static XElement? Property(WebDavResource resource, string localName) =>
-        resource.Properties.FirstOrDefault(property => property.Name == WebDavXml.Dav + localName)?.ToXElement();
+    public static XElement? Property(WebDavResource resource, string localName)
+    {
+        return resource.Properties.FirstOrDefault(property => property.Name == WebDavXml.Dav + localName)?.ToXElement();
+    }
 
     /// <summary>读取成功属性下直接 href 子项，不遍历到嵌套报告的其他资源。</summary>
     /// <param name="resource">资源快照。</param>
     /// <param name="localName">href 容器名称。</param>
     /// <returns>保持服务器顺序的 URI 引用文本集合。</returns>
-    public static IReadOnlyCollection<string> ReadHrefs(WebDavResource resource, string localName) =>
-        Property(resource, localName)?.Elements(WebDavXml.Dav + "href").Select(element => element.Value).ToArray() ?? [];
+    public static IReadOnlyCollection<string> ReadHrefs(WebDavResource resource, string localName)
+    {
+        return Property(resource, localName)?.Elements(WebDavXml.Dav + "href").Select(element => element.Value).ToArray() ?? [];
+    }
 
     /// <summary>为请求根元素复制扩展节点，使调用者的 XML 树不被重新挂载或修改。</summary>
     /// <param name="root">接收扩展的正文根。</param>
@@ -74,7 +82,7 @@ internal static class VersioningXml
     /// <returns>添加扩展后的同一根元素。</returns>
     public static XElement AddExtensions(XElement root, IEnumerable<XElement> extensions)
     {
-        foreach (var extension in extensions)
+        foreach (XElement extension in extensions)
         {
             ArgumentNullException.ThrowIfNull(extension);
             root.Add(new XElement(extension));

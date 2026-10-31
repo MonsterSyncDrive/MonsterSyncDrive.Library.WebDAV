@@ -21,7 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Helpers;
+using MonsterSyncDrive.Library.WebDAV.Core;
+
+namespace MonsterSyncDrive.Library.WebDAV.Helpers;
 
 /// <summary>
 /// 生成 WebDAV If 条件头，并规范化锁令牌的尖括号格式。
@@ -34,7 +36,10 @@ internal static class IfHeaderHelper
     /// </summary>
     /// <param name="lockToken">待提交的绝对锁令牌 URI，可带一层外部尖括号。</param>
     /// <returns>形如 (&lt;token&gt;) 的条件文本。</returns>
-    public static string GetHeaderValue(string lockToken) => $"(<{Normalize(lockToken)}>)";
+    public static string GetHeaderValue(string lockToken)
+    {
+        return $"(<{Normalize(lockToken)}>)";
+    }
 
     /// <summary>
     /// 生成绑定指定绝对资源 URI 的带标记锁条件。
@@ -42,7 +47,10 @@ internal static class IfHeaderHelper
     /// <param name="uri">锁令牌应作用的绝对资源 URI，必须是对应的源资源或目标资源。</param>
     /// <param name="lockToken">该资源的绝对锁令牌 URI。</param>
     /// <returns>形如 &lt;resource-uri&gt; (&lt;token&gt;) 的条件文本。</returns>
-    public static string Tagged(Uri uri, string lockToken) => $"<{uri.AbsoluteUri}> {GetHeaderValue(lockToken)}";
+    public static string Tagged(Uri uri, string lockToken)
+    {
+        return $"<{uri.AbsoluteUri}> {GetHeaderValue(lockToken)}";
+    }
 
     /// <summary>
     /// 移除可选的一层外部尖括号，并验证锁令牌可安全写入 DAV 条件头。
@@ -56,12 +64,12 @@ internal static class IfHeaderHelper
         ArgumentException.ThrowIfNullOrWhiteSpace(lockToken);
         if (lockToken.Any(character => character is '\r' or '\n'))
             throw new ArgumentException("Lock token cannot contain line breaks.", nameof(lockToken));
-        var token = lockToken.Trim();
+        string token = lockToken.Trim();
         // API 接受服务器返回的裸 URI 或已有一层尖括号的头值，但最终生成协议头时只保留一层。
         if (token.StartsWith('<') && token.EndsWith('>'))
             token = token[1..^1];
         // 拒绝换行、空白和条件分隔字符，避免令牌破坏 If 列表或注入额外请求头。
         // URI 本身可以合法包含圆括号；只有 URI 外的圆括号才是 If 列表语法，不应错误拒绝合法状态令牌。
-        return MonsterSyncDrive.WebDAV.Core.WebDavIfSyntax.StateToken(token);
+        return WebDavIfSyntax.StateToken(token);
     }
 }

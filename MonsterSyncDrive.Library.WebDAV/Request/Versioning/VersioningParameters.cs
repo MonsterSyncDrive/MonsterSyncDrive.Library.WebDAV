@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core.Versioning;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request.Versioning;
 
 /// <summary>指定支持深度操作的 DeltaV 请求作用范围。</summary>
 public enum VersioningDepth
@@ -41,9 +41,15 @@ public enum VersioningDepth
 public class VersioningRequestOptions : WebDavRequestOptions
 {
     /// <summary>获取或设置支持深度的操作范围；null 时省略 Depth。</summary>
-    public VersioningDepth? Depth { get; set; }
+    public VersioningDepth? Depth
+    {
+        get; set;
+    }
     /// <summary>获取或设置未编码的版本标签；发送 Label 请求头时按 RFC3253 做 UTF-8 URI 编码，null 时省略。</summary>
-    public string? LabelSelector { get; set; }
+    public string? LabelSelector
+    {
+        get; set;
+    }
     /// <summary>获取或设置要附加到标准正文中的扩展元素；发送时复制完整 XML。</summary>
     public IReadOnlyCollection<XElement> ExtensionElements { get; set; } = [];
 }
@@ -52,22 +58,37 @@ public class VersioningRequestOptions : WebDavRequestOptions
 public sealed class VersionControlParameters : VersioningRequestOptions
 {
     /// <summary>获取或设置已有版本 URI；null 时由服务器创建初始版本及版本历史。</summary>
-    public Uri? Version { get; set; }
+    public Uri? Version
+    {
+        get; set;
+    }
 }
 
 /// <summary>配置原地检出或创建工作资源，并可关联活动或请求未保留检出。</summary>
 public sealed class CheckoutParameters : VersioningRequestOptions
 {
     /// <summary>获取或设置是否允许服务器创建版本分支。</summary>
-    public bool ForkOk { get; set; }
+    public bool ForkOk
+    {
+        get; set;
+    }
     /// <summary>获取或设置对版本受控资源的选定版本执行检出，而非默认原地检出。</summary>
-    public bool ApplyToVersion { get; set; }
+    public bool ApplyToVersion
+    {
+        get; set;
+    }
     /// <summary>获取或设置是否请求未保留检出，允许并行开发的服务器语义。</summary>
-    public bool Unreserved { get; set; }
+    public bool Unreserved
+    {
+        get; set;
+    }
     /// <summary>获取或设置关联的活动 URI；与 CreateActivity 互斥。</summary>
     public IReadOnlyCollection<Uri> Activities { get; set; } = [];
     /// <summary>获取或设置是否要求服务器创建新活动；与 Activities 非空互斥。</summary>
-    public bool CreateActivity { get; set; }
+    public bool CreateActivity
+    {
+        get; set;
+    }
 
     /// <summary>构造检出正文，验证活动选择的互斥约束。</summary>
     /// <returns>完整 DAV:checkout 根元素。</returns>
@@ -75,12 +96,17 @@ public sealed class CheckoutParameters : VersioningRequestOptions
     {
         if (CreateActivity && Activities.Count != 0)
             throw new ArgumentException("An activity-set cannot contain both new and href.");
-        var root = new XElement(WebDavXml.Dav + "checkout");
-        if (ForkOk) root.Add(new XElement(WebDavXml.Dav + "fork-ok"));
-        if (ApplyToVersion) root.Add(new XElement(WebDavXml.Dav + "apply-to-version"));
-        if (Unreserved) root.Add(new XElement(WebDavXml.Dav + "unreserved"));
-        if (CreateActivity) root.Add(new XElement(WebDavXml.Dav + "activity-set", new XElement(WebDavXml.Dav + "new")));
-        else if (Activities.Count != 0) root.Add(VersioningXml.Hrefs("activity-set", Activities));
+        XElement root = new(WebDavXml.Dav + "checkout");
+        if (ForkOk)
+            root.Add(new XElement(WebDavXml.Dav + "fork-ok"));
+        if (ApplyToVersion)
+            root.Add(new XElement(WebDavXml.Dav + "apply-to-version"));
+        if (Unreserved)
+            root.Add(new XElement(WebDavXml.Dav + "unreserved"));
+        if (CreateActivity)
+            root.Add(new XElement(WebDavXml.Dav + "activity-set", new XElement(WebDavXml.Dav + "new")));
+        else if (Activities.Count != 0)
+            root.Add(VersioningXml.Hrefs("activity-set", Activities));
         return VersioningXml.AddExtensions(root, ExtensionElements);
     }
 }
@@ -89,9 +115,15 @@ public sealed class CheckoutParameters : VersioningRequestOptions
 public sealed class CheckinParameters : VersioningRequestOptions
 {
     /// <summary>获取或设置检入完成后继续保持版本受控资源为检出状态。</summary>
-    public bool KeepCheckedOut { get; set; }
+    public bool KeepCheckedOut
+    {
+        get; set;
+    }
     /// <summary>获取或设置是否接受可能产生的版本分支。</summary>
-    public bool ForkOk { get; set; }
+    public bool ForkOk
+    {
+        get; set;
+    }
 }
 
 /// <summary>指定标签关联的修改动作。</summary>
@@ -111,16 +143,25 @@ public sealed class LabelParameters : VersioningRequestOptions
     /// <summary>获取或设置标签名称；必须非空，内容由 XML 序列化器转义。</summary>
     public string LabelName { get; set; } = "";
     /// <summary>获取或设置标签动作，默认 Set。</summary>
-    public VersionLabelAction Action { get; set; }
+    public VersionLabelAction Action
+    {
+        get; set;
+    }
 }
 
 /// <summary>配置 UPDATE 使用版本 URI 或标签更新版本受控资源。</summary>
 public sealed class UpdateVersionParameters : VersioningRequestOptions
 {
     /// <summary>获取或设置要更新到的版本 URI；与 LabelName 互斥。</summary>
-    public Uri? Version { get; set; }
+    public Uri? Version
+    {
+        get; set;
+    }
     /// <summary>获取或设置选择版本的标签；与 Version 互斥。</summary>
-    public string? LabelName { get; set; }
+    public string? LabelName
+    {
+        get; set;
+    }
     /// <summary>获取或设置修改结果需要返回的属性名称。</summary>
     public IReadOnlyCollection<XName> Properties { get; set; } = [];
 }
@@ -131,13 +172,25 @@ public sealed class MergeParameters : VersioningRequestOptions
     /// <summary>获取或设置一个或多个合并源，可以是版本、工作区或服务器支持的活动 URI。</summary>
     public IReadOnlyCollection<Uri> Sources { get; set; } = [];
     /// <summary>获取或设置禁止服务器自动合并内容，要求显式冲突处理。</summary>
-    public bool NoAutoMerge { get; set; }
+    public bool NoAutoMerge
+    {
+        get; set;
+    }
     /// <summary>获取或设置禁止自动检出需要修改的目标。</summary>
-    public bool NoCheckout { get; set; }
+    public bool NoCheckout
+    {
+        get; set;
+    }
     /// <summary>获取或设置合并前先检入源活动；仅支持活动的服务器可执行。</summary>
-    public bool CheckinActivity { get; set; }
+    public bool CheckinActivity
+    {
+        get; set;
+    }
     /// <summary>获取或设置合并时的检出参数，可指定 fork、活动及未保留检出。</summary>
-    public CheckoutParameters? Checkout { get; set; }
+    public CheckoutParameters? Checkout
+    {
+        get; set;
+    }
     /// <summary>获取或设置修改资源需要返回的属性名称。</summary>
     public IReadOnlyCollection<XName> Properties { get; set; } = [];
 }
@@ -146,16 +199,25 @@ public sealed class MergeParameters : VersioningRequestOptions
 public sealed class BaselineControlParameters : VersioningRequestOptions
 {
     /// <summary>获取或设置用于初始化配置的已有基线 URI。</summary>
-    public Uri? Baseline { get; set; }
+    public Uri? Baseline
+    {
+        get; set;
+    }
 }
 
 /// <summary>描述 expand-property 报告的一项属性及其递归展开路径。</summary>
 public sealed class ExpandedVersionProperty
 {
     /// <summary>获取需要请求或展开的完整属性名称。</summary>
-    public XName Name { get; }
+    public XName Name
+    {
+        get;
+    }
     /// <summary>获取该属性 href 指向资源上继续展开的属性集合。</summary>
-    public IReadOnlyCollection<ExpandedVersionProperty> Children { get; }
+    public IReadOnlyCollection<ExpandedVersionProperty> Children
+    {
+        get;
+    }
 
     /// <summary>创建带可选递归子选择器的属性选择。</summary>
     /// <param name="name">包含命名空间和本地名称的属性名。</param>
@@ -170,8 +232,11 @@ public sealed class ExpandedVersionProperty
 
     /// <summary>递归生成 property 选择器；属性名称与命名空间通过 XML 特性表达。</summary>
     /// <returns>完整 DAV:property 元素。</returns>
-    internal XElement ToXml() => new(WebDavXml.Dav + "property",
+    internal XElement ToXml()
+    {
+        return new(WebDavXml.Dav + "property",
         new XAttribute("name", Name.LocalName), new XAttribute("namespace", Name.NamespaceName),
         Children.Select(child => child.ToXml()));
+    }
 }
 

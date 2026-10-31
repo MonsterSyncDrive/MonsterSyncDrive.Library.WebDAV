@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 描述 RFC 6578 中一个成员 URL 的同步结果类别。
@@ -60,13 +60,22 @@ public sealed class WebDavSyncChange
     }
 
     /// <summary>获取服务器返回的完整资源和逐属性结果。</summary>
-    public WebDavResource Resource { get; }
+    public WebDavResource Resource
+    {
+        get;
+    }
 
     /// <summary>获取经过 URI 规则解析的绝对成员地址，不使用本地文件路径规则。</summary>
-    public Uri ResolvedUri { get; }
+    public Uri ResolvedUri
+    {
+        get;
+    }
 
     /// <summary>获取新增或修改、删除、不可遍历或失败的分类。</summary>
-    public WebDavSyncChangeKind Kind { get; }
+    public WebDavSyncChangeKind Kind
+    {
+        get;
+    }
 
     /// <summary>获取此条目是否为协议定义的删除记录。</summary>
     public bool IsDeleted => Kind == WebDavSyncChangeKind.Deleted;

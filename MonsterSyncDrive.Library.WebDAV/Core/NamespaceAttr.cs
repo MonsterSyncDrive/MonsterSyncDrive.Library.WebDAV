@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 描述请求 XML 中显式声明的命名空间及其可选前缀。
@@ -53,10 +53,16 @@ public class NamespaceAttr
     /// 获取命名空间前缀。
     /// </summary>
     /// <value>null 或空字符串表示声明默认命名空间。</value>
-    public string? Prefix { get; }
+    public string? Prefix
+    {
+        get;
+    }
 
     /// <summary>
     /// 获取 XML 命名空间 URI，作为属性完整名称的一部分使用。
     /// </summary>
-    public string Namespace { get; }
+    public string Namespace
+    {
+        get;
+    }
 }

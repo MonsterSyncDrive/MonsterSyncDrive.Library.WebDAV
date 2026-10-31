@@ -23,7 +23,7 @@
  */
 using System.Net.Http.Headers;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>标识 DAV If 条件中状态令牌或实体标签两种原子条件。</summary>
 public enum WebDavIfConditionKind
@@ -50,20 +50,31 @@ public sealed class WebDavIfCondition
     }
 
     /// <summary>获取原子条件的类别。</summary>
-    public WebDavIfConditionKind Kind { get; }
+    public WebDavIfConditionKind Kind
+    {
+        get;
+    }
 
     /// <summary>获取已校验的令牌 URI 或带引号的强/弱 ETag。</summary>
-    public string Value { get; }
+    public string Value
+    {
+        get;
+    }
 
     /// <summary>获取是否使用 Not 对当前条件取反。</summary>
-    public bool IsNegated { get; }
+    public bool IsNegated
+    {
+        get;
+    }
 
     /// <summary>创建一个绝对状态令牌条件。</summary>
     /// <param name="token">绝对 URI，可以带一层外部尖括号。</param>
     /// <param name="isNegated">是否取反，默认 false。</param>
     /// <returns>已校验且不可变的状态令牌条件。</returns>
-    public static WebDavIfCondition StateToken(string token, bool isNegated = false) =>
-        new(WebDavIfConditionKind.StateToken, WebDavIfSyntax.StateToken(token), isNegated);
+    public static WebDavIfCondition StateToken(string token, bool isNegated = false)
+    {
+        return new(WebDavIfConditionKind.StateToken, WebDavIfSyntax.StateToken(token), isNegated);
+    }
 
     /// <summary>创建一个强或弱 ETag 条件，不允许 HTTP 通配符 *。</summary>
     /// <param name="etag">包含双引号的标签，例如 "v1" 或 W/"v1"。</param>
@@ -72,15 +83,18 @@ public sealed class WebDavIfCondition
     public static WebDavIfCondition EntityTag(string etag, bool isNegated = false)
     {
         ArgumentNullException.ThrowIfNull(etag);
-        if (etag.Any(character => character is '\r' or '\n') || !EntityTagHeaderValue.TryParse(etag, out var value) || value.Tag == "*")
-            throw new ArgumentException("Expected one strong or weak entity tag, without a wildcard.", nameof(etag));
-        return new(WebDavIfConditionKind.EntityTag, value.ToString(), isNegated);
+        return etag.Any(character => character is '\r' or '\n') || !EntityTagHeaderValue.TryParse(etag, out EntityTagHeaderValue? value) || value.Tag == "*"
+            ? throw new ArgumentException("Expected one strong or weak entity tag, without a wildcard.", nameof(etag))
+            : new(WebDavIfConditionKind.EntityTag, value.ToString(), isNegated);
     }
 
     /// <summary>生成带标准定界符的原子条件文本。</summary>
     /// <returns>可选 Not 加尖括号令牌或方括号实体标签。</returns>
-    public override string ToString() => (IsNegated ? "Not " : "") +
+    public override string ToString()
+    {
+        return (IsNegated ? "Not " : "") +
         (Kind == WebDavIfConditionKind.StateToken ? "<" + Value + ">" : "[" + Value + "]");
+    }
 }
 
 /// <summary>表示 DAV If 中由一个或多个条件组成的逻辑 AND 列表。</summary>
@@ -97,11 +111,17 @@ public sealed class WebDavIfList
     }
 
     /// <summary>获取按 AND 组合的原子条件集合。</summary>
-    public IReadOnlyList<WebDavIfCondition> Conditions { get; }
+    public IReadOnlyList<WebDavIfCondition> Conditions
+    {
+        get;
+    }
 
     /// <summary>输出圆括号包围的 AND 条件列表。</summary>
     /// <returns>形如 (&lt;token&gt; ["etag"]) 的规范表达式。</returns>
-    public override string ToString() => "(" + string.Join(" ", Conditions) + ")";
+    public override string ToString()
+    {
+        return "(" + string.Join(" ", Conditions) + ")";
+    }
 }
 
 /// <summary>表示一个资源标记及其按 OR 组合的候选条件列表。</summary>
@@ -126,14 +146,23 @@ public sealed class WebDavIfResourceConditions
         : this(resourceUri?.OriginalString ?? throw new ArgumentNullException(nameof(resourceUri)), alternatives) { }
 
     /// <summary>获取不带外部尖括号的资源 URI 引用。</summary>
-    public string ResourceUri { get; }
+    public string ResourceUri
+    {
+        get;
+    }
 
     /// <summary>获取当前资源按 OR 组合的候选列表。</summary>
-    public IReadOnlyList<WebDavIfList> Alternatives { get; }
+    public IReadOnlyList<WebDavIfList> Alternatives
+    {
+        get;
+    }
 
     /// <summary>生成绑定当前资源的完整带标记条件。</summary>
     /// <returns>资源标记后跟一个或多个圆括号条件列表。</returns>
-    public override string ToString() => "<" + ResourceUri + "> " + string.Join(" ", Alternatives);
+    public override string ToString()
+    {
+        return "<" + ResourceUri + "> " + string.Join(" ", Alternatives);
+    }
 }
 
 /// <summary>表示 RFC 4918 的完整 DAV If 请求头表达式。</summary>
@@ -150,10 +179,16 @@ public sealed class WebDavIfHeader
     }
 
     /// <summary>获取无标记模式的候选列表，列表之间按 OR 组合。</summary>
-    public IReadOnlyList<WebDavIfList> Lists { get; }
+    public IReadOnlyList<WebDavIfList> Lists
+    {
+        get;
+    }
 
     /// <summary>获取带资源标记的候选列表，不能与 Lists 同时使用。</summary>
-    public IReadOnlyList<WebDavIfResourceConditions> Resources { get; }
+    public IReadOnlyList<WebDavIfResourceConditions> Resources
+    {
+        get;
+    }
 
     /// <summary>获取当前表达式是否采用带资源标记的语法。</summary>
     public bool IsTagged => Resources.Count > 0;
@@ -164,9 +199,9 @@ public sealed class WebDavIfHeader
     public static WebDavIfHeader ForRequest(params WebDavIfList[] alternatives)
     {
         ArgumentNullException.ThrowIfNull(alternatives);
-        if (alternatives.Length == 0 || alternatives.Any(list => list is null))
-            throw new ArgumentException("Expected at least one untagged condition list.", nameof(alternatives));
-        return new(Array.AsReadOnly(alternatives.ToArray()), Array.Empty<WebDavIfResourceConditions>());
+        return alternatives.Length == 0 || alternatives.Any(list => list is null)
+            ? throw new ArgumentException("Expected at least one untagged condition list.", nameof(alternatives))
+            : new(Array.AsReadOnly(alternatives.ToArray()), Array.Empty<WebDavIfResourceConditions>());
     }
 
     /// <summary>为一个或多个明确的资源 URI 建立带标记条件。</summary>
@@ -175,9 +210,9 @@ public sealed class WebDavIfHeader
     public static WebDavIfHeader ForResources(params WebDavIfResourceConditions[] resources)
     {
         ArgumentNullException.ThrowIfNull(resources);
-        if (resources.Length == 0 || resources.Any(resource => resource is null))
-            throw new ArgumentException("Expected at least one tagged condition group.", nameof(resources));
-        return new(Array.Empty<WebDavIfList>(), Array.AsReadOnly(resources.ToArray()));
+        return resources.Length == 0 || resources.Any(resource => resource is null)
+            ? throw new ArgumentException("Expected at least one tagged condition group.", nameof(resources))
+            : new(Array.Empty<WebDavIfList>(), Array.AsReadOnly(resources.ToArray()));
     }
 
     /// <summary>解析完整 DAV If 字段值，拒绝空列表、混用语法和头部注入字符。</summary>
@@ -197,14 +232,25 @@ public sealed class WebDavIfHeader
     public static bool TryParse(string? value, out WebDavIfHeader? result)
     {
         result = null;
-        if (value is null) return false;
-        try { result = Parse(value); return true; }
-        catch (Exception error) when (error is ArgumentException or FormatException) { return false; }
+        if (value is null)
+            return false;
+        try
+        {
+            result = Parse(value);
+            return true;
+        }
+        catch (Exception error) when (error is ArgumentException or FormatException)
+        {
+            return false;
+        }
     }
 
     /// <summary>输出单个规范 If 字段值，不混合有标记和无标记语法。</summary>
     /// <returns>可以直接写入 HttpRequestHeaders 的表达式。</returns>
-    public override string ToString() => IsTagged ? string.Join(" ", Resources) : string.Join(" ", Lists);
+    public override string ToString()
+    {
+        return IsTagged ? string.Join(" ", Resources) : string.Join(" ", Lists);
+    }
 
     /// <summary>采用非递归扫描解析 If，避免嵌套表达式或非法分隔符被宽松接受。</summary>
     private sealed class Parser
@@ -219,7 +265,7 @@ public sealed class WebDavIfHeader
         /// <param name="text">单行 If 字段值。</param>
         public Parser(string text)
         {
-            if (text.Any(character => character is '\r' or '\n' || char.IsControl(character) && character != '\t'))
+            if (text.Any(character => character is '\r' or '\n' || (char.IsControl(character) && character != '\t')))
                 throw new FormatException("An If field cannot contain line breaks or control characters.");
             _text = text;
         }
@@ -232,24 +278,38 @@ public sealed class WebDavIfHeader
             if (Peek() == '(')
             {
                 List<WebDavIfList> lists = [];
-                while (Peek() == '(') { lists.Add(ReadList()); SkipWhitespace(); }
+                while (Peek() == '(')
+                {
+                    lists.Add(ReadList());
+                    SkipWhitespace();
+                }
                 End();
                 return ForRequest(lists.ToArray());
             }
             List<WebDavIfResourceConditions> resources = [];
             while (Peek() == '<')
             {
-                var resource = ReadCoded();
+                string resource = ReadCoded();
                 SkipWhitespace();
                 List<WebDavIfList> alternatives = [];
-                while (Peek() == '(') { alternatives.Add(ReadList()); SkipWhitespace(); }
-                if (alternatives.Count == 0) throw Invalid();
-                try { resources.Add(new(resource, alternatives.ToArray())); }
-                catch (ArgumentException error) { throw new FormatException("Invalid If resource tag.", error); }
+                while (Peek() == '(')
+                {
+                    alternatives.Add(ReadList());
+                    SkipWhitespace();
+                }
+                if (alternatives.Count == 0)
+                    throw Invalid();
+                try
+                {
+                    resources.Add(new(resource, alternatives.ToArray()));
+                }
+                catch (ArgumentException error)
+                {
+                    throw new FormatException("Invalid If resource tag.", error);
+                }
             }
             End();
-            if (resources.Count == 0) throw Invalid();
-            return ForResources(resources.ToArray());
+            return resources.Count == 0 ? throw Invalid() : ForResources(resources.ToArray());
         }
 
         /// <summary>解析一个圆括号列表，并要求至少存在一个条件。</summary>
@@ -261,8 +321,9 @@ public sealed class WebDavIfHeader
             List<WebDavIfCondition> conditions = [];
             while (Peek() != ')')
             {
-                if (_position >= _text.Length) throw Invalid();
-                var negate = false;
+                if (_position >= _text.Length)
+                    throw Invalid();
+                bool negate = false;
                 if (_position + 3 <= _text.Length && _text.AsSpan(_position, 3).Equals("Not", StringComparison.OrdinalIgnoreCase))
                 {
                     negate = true;
@@ -278,12 +339,14 @@ public sealed class WebDavIfHeader
                         _ => throw Invalid()
                     });
                 }
-                catch (ArgumentException error) { throw new FormatException("Invalid If condition.", error); }
+                catch (ArgumentException error)
+                {
+                    throw new FormatException("Invalid If condition.", error);
+                }
                 SkipWhitespace();
             }
             Require(')');
-            if (conditions.Count == 0) throw Invalid();
-            return new(conditions.ToArray());
+            return conditions.Count == 0 ? throw Invalid() : new(conditions.ToArray());
         }
 
         /// <summary>读取尖括号内完整 URI，不把 URI 自身的圆括号当成列表定界符。</summary>
@@ -291,9 +354,14 @@ public sealed class WebDavIfHeader
         private string ReadCoded()
         {
             Require('<');
-            var start = _position;
-            while (Peek() != '>') { if (_position >= _text.Length) throw Invalid(); _position++; }
-            var value = _text[start.._position];
+            int start = _position;
+            while (Peek() != '>')
+            {
+                if (_position >= _text.Length)
+                    throw Invalid();
+                _position++;
+            }
+            string value = _text[start.._position];
             Require('>');
             return value;
         }
@@ -303,33 +371,59 @@ public sealed class WebDavIfHeader
         private string ReadETag()
         {
             Require('[');
-            var start = _position;
-            if (_position + 2 <= _text.Length && _text.AsSpan(_position, 2).SequenceEqual("W/")) _position += 2;
+            int start = _position;
+            if (_position + 2 <= _text.Length && _text.AsSpan(_position, 2).SequenceEqual("W/"))
+                _position += 2;
             Require('"');
-            while (Peek() != '"') { if (_position >= _text.Length) throw Invalid(); _position++; }
+            while (Peek() != '"')
+            {
+                if (_position >= _text.Length)
+                    throw Invalid();
+                _position++;
+            }
             Require('"');
-            var value = _text[start.._position];
+            string value = _text[start.._position];
             Require(']');
             return value;
         }
 
         /// <summary>读取当前位置字符，文档末尾返回零字符。</summary>
         /// <returns>当前字符或文档末尾的零字符。</returns>
-        private char Peek() => _position < _text.Length ? _text[_position] : '\0';
+        private char Peek()
+        {
+            return _position < _text.Length ? _text[_position] : '\0';
+        }
 
         /// <summary>消费协议允许的空格及水平制表符。</summary>
-        private void SkipWhitespace() { while (Peek() is ' ' or '\t') _position++; }
+        private void SkipWhitespace()
+        {
+            while (Peek() is ' ' or '\t')
+                _position++;
+        }
 
         /// <summary>匹配并消费一个必须出现的分隔符。</summary>
         /// <param name="character">预期分隔字符。</param>
-        private void Require(char character) { if (Peek() != character) throw Invalid(); _position++; }
+        private void Require(char character)
+        {
+            if (Peek() != character)
+                throw Invalid();
+            _position++;
+        }
 
         /// <summary>确保输入没有未消费的混用语法或多余内容。</summary>
-        private void End() { SkipWhitespace(); if (_position != _text.Length) throw Invalid(); }
+        private void End()
+        {
+            SkipWhitespace();
+            if (_position != _text.Length)
+                throw Invalid();
+        }
 
         /// <summary>为当前错误位置创建不泄露请求凭据的格式异常。</summary>
         /// <returns>带字符位置的 FormatException。</returns>
-        private FormatException Invalid() => new("Invalid DAV If expression at character " + _position + ".");
+        private FormatException Invalid()
+        {
+            return new("Invalid DAV If expression at character " + _position + ".");
+        }
     }
 }
 
@@ -342,11 +436,12 @@ internal static class WebDavIfSyntax
     internal static string StateToken(string token)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(token);
-        var value = token;
-        if (value.StartsWith('<') && value.EndsWith('>')) value = value[1..^1];
-        if (!HeaderSafe(value) || !Uri.IsWellFormedUriString(value, UriKind.Absolute))
-            throw new ArgumentException("A state token must be an absolute URI without whitespace or angle brackets.", nameof(token));
-        return value;
+        string value = token;
+        if (value.StartsWith('<') && value.EndsWith('>'))
+            value = value[1..^1];
+        return !HeaderSafe(value) || !Uri.IsWellFormedUriString(value, UriKind.Absolute)
+            ? throw new ArgumentException("A state token must be an absolute URI without whitespace or angle brackets.", nameof(token))
+            : value;
     }
 
     /// <summary>校验绝对 URI 或绝对路径形式的资源标记，不接受相对路径和片段。</summary>
@@ -355,17 +450,20 @@ internal static class WebDavIfSyntax
     internal static string ResourceTag(string resource)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resource);
-        if (!HeaderSafe(resource) || resource.Contains('#')
+        return !HeaderSafe(resource) || resource.Contains('#')
             || !(Uri.IsWellFormedUriString(resource, UriKind.Absolute)
-                || resource.StartsWith('/') && !resource.StartsWith("//", StringComparison.Ordinal) && Uri.IsWellFormedUriString(resource, UriKind.Relative)))
-            throw new ArgumentException("A resource tag must be an absolute URI or absolute path without a fragment.", nameof(resource));
-        return resource;
+                || (resource.StartsWith('/') && !resource.StartsWith("//", StringComparison.Ordinal) && Uri.IsWellFormedUriString(resource, UriKind.Relative)))
+            ? throw new ArgumentException("A resource tag must be an absolute URI or absolute path without a fragment.", nameof(resource))
+            : resource;
     }
 
     /// <summary>拒绝头部定界字符、控制字符、裸空白及未编码的非 ASCII 字符。</summary>
     /// <param name="value">待检查的 URI 字段。</param>
     /// <returns>文本适合写入尖括号字段时为 true。</returns>
-    private static bool HeaderSafe(string value) => value.Length > 0 &&
-        value.All(character => character is > ' ' and < '\x7f' && character is not ('<' or '>'));
+    private static bool HeaderSafe(string value)
+    {
+        return value.Length > 0 &&
+        value.All(character => character is > ' ' and < '\x7f' and not ('<' or '>'));
+    }
 }
 

@@ -21,7 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Response;
+using MonsterSyncDrive.Library.WebDAV.Core;
+
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>
 /// 保存操作的 HTTP 状态及脱离网络生命周期的响应头快照。
@@ -54,16 +56,25 @@ public class WebDavResponse
     /// <summary>
     /// 获取服务器返回的整数 HTTP 状态码。
     /// </summary>
-    public int StatusCode { get; }
+    public int StatusCode
+    {
+        get;
+    }
 
     /// <summary>
     /// 获取 HTTP 响应原因短语或调用方提供的状态说明。
     /// </summary>
     /// <value>HTTP/2 等响应可能不提供原因短语，此时为 null 或空文本。</value>
-    public string? Description { get; }
+    public string? Description
+    {
+        get;
+    }
 
     /// <summary>获取 HTTP 错误正文中的 DAV 前置或后置条件及扩展详情，未提供时为 null。</summary>
-    public MonsterSyncDrive.WebDAV.Core.WebDavError? Error { get; internal set; }
+    public WebDavError? Error
+    {
+        get; internal set;
+    }
 
     /// <summary>
     /// 获取基础 HTTP 状态码是否在 200 至 299 范围内。
@@ -86,7 +97,10 @@ public class WebDavResponse
     /// </summary>
     /// <param name="name">响应头或正文头名称，例如 ETag、Content-Length 或 DAV。</param>
     /// <returns>以逗号及空格连接的头值，未提供时为 null。</returns>
-    public string? GetHeader(string name) => Headers.TryGetValue(name, out var values) ? string.Join(", ", values) : null;
+    public string? GetHeader(string name)
+    {
+        return Headers.TryGetValue(name, out string[]? values) ? string.Join(", ", values) : null;
+    }
 
     /// <summary>
     /// 检查实际派生类型的 IsSuccessful，在 HTTP 或多状态内部失败时抛出异常。
@@ -96,9 +110,9 @@ public class WebDavResponse
     /// <exception cref="HttpRequestException">响应的 IsSuccessful 为 false，异常保留外层 HTTP 状态码。</exception>
     public WebDavResponse EnsureSuccessStatusCode()
     {
-        if (!IsSuccessful)
-            throw new System.Net.Http.HttpRequestException($"WebDAV returned {StatusCode}: {Description}", null, (System.Net.HttpStatusCode)StatusCode);
-        return this;
+        return !IsSuccessful
+            ? throw new System.Net.Http.HttpRequestException($"WebDAV returned {StatusCode}: {Description}", null, (System.Net.HttpStatusCode)StatusCode)
+            : this;
     }
 
     /// <summary>
@@ -121,5 +135,8 @@ public class WebDavResponse
     /// 返回当前WebDavResponse的状态或属性概要，便于日志记录和调试。
     /// </summary>
     /// <returns>包含当前对象关键字段的描述字符串，不触发网络请求。</returns>
-    public override string ToString() => $"WebDAV response - StatusCode: {StatusCode}, Description: {Description}";
+    public override string ToString()
+    {
+        return $"WebDAV response - StatusCode: {StatusCode}, Description: {Description}";
+    }
 }

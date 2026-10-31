@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Helpers;
 using System.Globalization;
-using MonsterSyncDrive.WebDAV.Helpers;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>指定服务器应返回最小响应还是当前资源表示。</summary>
 public enum WebDavReturnPreference
@@ -56,7 +56,10 @@ public sealed class WebDavPreferences
     private readonly Dictionary<string, string> _parameters = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>获取或设置正文返回偏好。</summary>
-    public WebDavReturnPreference Return { get; set; }
+    public WebDavReturnPreference Return
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置是否省略属性查询中的 404 属性状态。</summary>
     /// <remarks>该便利属性对应 return=minimal，协议不存在独立的标准 omit-404 偏好。</remarks>
@@ -65,22 +68,36 @@ public sealed class WebDavPreferences
         get => Return == WebDavReturnPreference.Minimal;
         set
         {
-            if (value) Return = WebDavReturnPreference.Minimal;
-            else if (Return == WebDavReturnPreference.Minimal) Return = WebDavReturnPreference.Unspecified;
+            if (value)
+                Return = WebDavReturnPreference.Minimal;
+            else if (Return == WebDavReturnPreference.Minimal)
+                Return = WebDavReturnPreference.Unspecified;
         }
     }
 
     /// <summary>获取或设置 depth-noroot，仅处理 Depth 1 或 infinity 的后代而排除目标根资源。</summary>
-    public bool DepthNoRoot { get; set; }
+    public bool DepthNoRoot
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置严格或宽松处理偏好。</summary>
-    public WebDavHandlingPreference Handling { get; set; }
+    public WebDavHandlingPreference Handling
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置是否允许服务器异步接受操作，使用 respond-async。</summary>
-    public bool RespondAsync { get; set; }
+    public bool RespondAsync
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置服务器可等待的非负秒数；null 表示不发送 wait。</summary>
-    public int? WaitSeconds { get; set; }
+    public int? WaitSeconds
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置尚未建模的合法偏好项，包含可选值及参数。</summary>
     /// <remarks>每个字符串必须是一个完整项，不能包含项外的逗号、控制字符或与已设置项重复的名称。</remarks>
@@ -94,23 +111,30 @@ public sealed class WebDavPreferences
     /// <returns>逗号分隔的偏好文本；没有偏好时返回空字符串。</returns>
     public override string ToString()
     {
-        if (!Enum.IsDefined(Return)) throw new ArgumentOutOfRangeException(nameof(Return));
-        if (!Enum.IsDefined(Handling)) throw new ArgumentOutOfRangeException(nameof(Handling));
-        if (WaitSeconds < 0) throw new ArgumentOutOfRangeException(nameof(WaitSeconds));
+        if (!Enum.IsDefined(Return))
+            throw new ArgumentOutOfRangeException(nameof(Return));
+        if (!Enum.IsDefined(Handling))
+            throw new ArgumentOutOfRangeException(nameof(Handling));
+        if (WaitSeconds < 0)
+            throw new ArgumentOutOfRangeException(nameof(WaitSeconds));
         ArgumentNullException.ThrowIfNull(Extensions);
         List<string> result = [];
         HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
         if (Return != WebDavReturnPreference.Unspecified)
             Add("return", Return == WebDavReturnPreference.Minimal ? "minimal" : "representation");
-        if (DepthNoRoot) Add("depth-noroot", null);
+        if (DepthNoRoot)
+            Add("depth-noroot", null);
         if (Handling != WebDavHandlingPreference.Unspecified)
             Add("handling", Handling == WebDavHandlingPreference.Strict ? "strict" : "lenient");
-        if (RespondAsync) Add("respond-async", null);
-        if (WaitSeconds is { } seconds) Add("wait", seconds.ToString(CultureInfo.InvariantCulture));
-        foreach (var extension in Extensions)
+        if (RespondAsync)
+            Add("respond-async", null);
+        if (WaitSeconds is { } seconds)
+            Add("wait", seconds.ToString(CultureInfo.InvariantCulture));
+        foreach (string extension in Extensions)
         {
-            var parsed = PreferenceHeaderParser.ParseItem(extension);
-            if (!names.Add(parsed.Name)) throw new ArgumentException("A preference name occurs more than once.", nameof(Extensions));
+            (string? Name, string? Value, string? Parameters) = PreferenceHeaderParser.ParseItem(extension);
+            if (!names.Add(Name))
+                throw new ArgumentException("A preference name occurs more than once.", nameof(Extensions));
             result.Add(extension.Trim());
         }
         return string.Join(", ", result);
@@ -118,7 +142,7 @@ public sealed class WebDavPreferences
         // 已知偏好可以保留解析所得参数，但参数不能改变当前显式选择的偏好值。
         void Add(string name, string? value)
         {
-            names.Add(name);
+            _ = names.Add(name);
             result.Add(name + (value is null ? "" : "=" + value) + _parameters.GetValueOrDefault(name, ""));
         }
     }
@@ -129,32 +153,50 @@ public sealed class WebDavPreferences
     public static WebDavPreferences Parse(string? header)
     {
         var result = new WebDavPreferences();
-        if (header is null) return result;
+        if (header is null)
+            return result;
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
         List<string> extensions = [];
-        foreach (var item in PreferenceHeaderParser.Split(header, ',', allowEmptyItems: true))
+        foreach (string item in PreferenceHeaderParser.Split(header, ',', allowEmptyItems: true))
         {
-            var parsed = PreferenceHeaderParser.ParseItem(item);
-            if (!seen.Add(parsed.Name)) continue; // RFC 7240 规定重复偏好名称只取第一项。
-            var name = parsed.Name.ToLowerInvariant();
-            var value = parsed.Value?.ToLowerInvariant();
-            var known = true;
+            (string? Name, string? Value, string? Parameters) = PreferenceHeaderParser.ParseItem(item);
+            if (!seen.Add(Name))
+                continue; // RFC 7240 规定重复偏好名称只取第一项。
+            string name = Name.ToLowerInvariant();
+            string? value = Value?.ToLowerInvariant();
+            bool known = true;
             switch (name)
             {
-                case "return" when value == "minimal": result.Return = WebDavReturnPreference.Minimal; break;
-                case "return" when value == "representation": result.Return = WebDavReturnPreference.Representation; break;
-                case "depth-noroot" when value is null: result.DepthNoRoot = true; break;
-                case "handling" when value == "strict": result.Handling = WebDavHandlingPreference.Strict; break;
-                case "handling" when value == "lenient": result.Handling = WebDavHandlingPreference.Lenient; break;
-                case "respond-async" when value is null: result.RespondAsync = true; break;
+                case "return" when value == "minimal":
+                    result.Return = WebDavReturnPreference.Minimal;
+                    break;
+                case "return" when value == "representation":
+                    result.Return = WebDavReturnPreference.Representation;
+                    break;
+                case "depth-noroot" when value is null:
+                    result.DepthNoRoot = true;
+                    break;
+                case "handling" when value == "strict":
+                    result.Handling = WebDavHandlingPreference.Strict;
+                    break;
+                case "handling" when value == "lenient":
+                    result.Handling = WebDavHandlingPreference.Lenient;
+                    break;
+                case "respond-async" when value is null:
+                    result.RespondAsync = true;
+                    break;
                 case "wait" when value is not null:
-                    if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds))
+                    if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int seconds))
                         throw new FormatException("Invalid wait preference.");
                     result.WaitSeconds = seconds;
                     break;
-                default: known = false; extensions.Add(item.Trim()); break;
+                default:
+                    known = false;
+                    extensions.Add(item.Trim());
+                    break;
             }
-            if (known && parsed.Parameters.Length > 0) result._parameters[name] = parsed.Parameters;
+            if (known && Parameters.Length > 0)
+                result._parameters[name] = Parameters;
         }
         result.Extensions = extensions.AsReadOnly();
         return result;

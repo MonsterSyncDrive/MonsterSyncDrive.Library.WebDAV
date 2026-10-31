@@ -23,7 +23,7 @@
  */
 using System.Net.Http.Headers;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request.Patching;
 
 /// <summary>配置 RFC 5789 PATCH 的补丁媒体类型、HTTP 条件、锁和源流所有权。</summary>
 /// <remarks>PATCH 不规定统一的补丁格式，媒体类型必须与服务器 Accept-Patch 声明及实际补丁格式一致。</remarks>
@@ -46,16 +46,28 @@ public sealed class SabreDavPartialUpdateParameters : PatchParameters
     public SabreDavPartialUpdateParameters() : base("application/x-sabredav-partialupdate") { }
 
     /// <summary>获取或设置是否将内容追加到文件末尾；true 时必须省略 Offset 和 End。</summary>
-    public bool Append { get; set; }
+    public bool Append
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置起始偏移；负数表示相对文件末尾，闭合区间不得使用负起点。</summary>
-    public long? Offset { get; set; }
+    public long? Offset
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置包含式结束偏移；null 表示从起点写入正文长度对应的字节。</summary>
-    public long? End { get; set; }
+    public long? End
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置不可定位源流的声明补丁长度；可计算正文长度时必须与其一致。</summary>
-    public long? ContentLength { get; set; }
+    public long? ContentLength
+    {
+        get; set;
+    }
 
     /// <summary>验证区间和正文长度，并生成 X-Update-Range。</summary>
     /// <param name="length">已知且非负的补丁正文字节数，SabreDAV 要求 Content-Length。</param>
@@ -65,14 +77,15 @@ public sealed class SabreDavPartialUpdateParameters : PatchParameters
         ArgumentOutOfRangeException.ThrowIfNegative(length);
         if (Append)
         {
-            if (Offset.HasValue || End.HasValue) throw new ArgumentException("Append must not specify a byte interval.");
-            return "append";
+            return Offset.HasValue || End.HasValue ? throw new ArgumentException("Append must not specify a byte interval.") : "append";
         }
-        if (!Offset.HasValue) throw new ArgumentException("A byte offset is required for partial overwrite.", nameof(Offset));
-        if (End.HasValue && (Offset < 0 || End < Offset)) throw new ArgumentOutOfRangeException(nameof(End));
-        if (End.HasValue && (End.Value - Offset.Value == long.MaxValue || End.Value - Offset.Value + 1 != length))
-            throw new ArgumentException("Patch length must equal the inclusive interval size.");
-        return "bytes=" + Offset.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) + "-"
+        if (!Offset.HasValue)
+            throw new ArgumentException("A byte offset is required for partial overwrite.", nameof(Offset));
+        return End.HasValue && (Offset < 0 || End < Offset)
+            ? throw new ArgumentOutOfRangeException(nameof(End))
+            : End.HasValue && (End.Value - Offset.Value == long.MaxValue || End.Value - Offset.Value + 1 != length)
+            ? throw new ArgumentException("Patch length must equal the inclusive interval size.")
+            : "bytes=" + Offset.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) + "-"
             + (End?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "");
     }
 }

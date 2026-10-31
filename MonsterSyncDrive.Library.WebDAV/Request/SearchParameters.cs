@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>RFC 5323 搜索参数，兼容旧的单属性 LIKE，同时支持完整标准表达式、多个范围及排序。</summary>
 /// <remarks>高级 Filter 与旧 SearchProperty/SearchKeyword 不可混用；无过滤查询需要显式设置 MatchAll，防止遗漏条件误扫全库。</remarks>
@@ -39,43 +39,73 @@ public class SearchParameters : WebDavRequestOptions
     }
 
     /// <summary>获取或设置旧式单范围的 URI；Scopes 非空时以 Scopes 为准。</summary>
-    public string Scope { get; set; }
+    public string Scope
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置单范围深度，默认 infinity。</summary>
     public ApplyTo.Propfind ScopeDepth { get; set; } = ApplyTo.Propfind.ResourceAndDescendants;
 
     /// <summary>获取或设置单范围是否包含历史版本。</summary>
-    public bool IncludeVersions { get; set; }
+    public bool IncludeVersions
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置多个完整搜索范围；空集合使用 Scope、ScopeDepth 和 IncludeVersions。</summary>
     public IReadOnlyCollection<WebDavSearchScope> Scopes { get; set; } = [];
 
     /// <summary>获取或设置旧式 LIKE 的属性完整名称。</summary>
-    public XName? SearchProperty { get; set; }
+    public XName? SearchProperty
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置旧式 LIKE 的非空模式文本。</summary>
-    public string? SearchKeyword { get; set; }
+    public string? SearchKeyword
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置旧式 LIKE 是否忽略大小写；null 保留服务器默认。</summary>
-    public bool? Caseless { get; set; }
+    public bool? Caseless
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置完整的标准搜索表达式，与旧式 LIKE 参数互斥。</summary>
-    public WebDavSearchExpression? Filter { get; set; }
+    public WebDavSearchExpression? Filter
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置是否显式请求不带 where 的全范围查询，不能同时指定过滤条件。</summary>
-    public bool MatchAll { get; set; }
+    public bool MatchAll
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置根元素的显式命名空间声明。</summary>
-    public IReadOnlyCollection<NamespaceAttr> Namespaces { get; set; }
+    public IReadOnlyCollection<NamespaceAttr> Namespaces
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置返回属性；空集合发送 allprop。</summary>
-    public IReadOnlyCollection<XName> SelectProperties { get; set; }
+    public IReadOnlyCollection<XName> SelectProperties
+    {
+        get; set;
+    }
 
     /// <summary>获取或设置按优先级排列的排序键，支持普通属性及相关性分数。</summary>
     public IReadOnlyCollection<WebDavSearchOrder> OrderBy { get; set; } = [];
 
     /// <summary>获取或设置请求的最大结果数；null 不限制，服务器按规范仍可忽略此建议。</summary>
-    public ulong? MaxResults { get; set; }
+    public ulong? MaxResults
+    {
+        get; set;
+    }
 
     /// <summary>验证搜索条件、范围与各集合的一致性，不默默忽略冲突设置。</summary>
     /// <exception cref="ArgumentException">过滤条件缺失或互相冲突，或者集合包含无效元素。</exception>
@@ -87,7 +117,7 @@ public class SearchParameters : WebDavRequestOptions
         ArgumentNullException.ThrowIfNull(OrderBy);
         if (Namespaces.Any(value => value is null) || SelectProperties.Any(value => value is null) || OrderBy.Any(value => value is null))
             throw new ArgumentException("Search collections cannot contain null elements.");
-        var hasLegacy = SearchProperty is not null || SearchKeyword is not null;
+        bool hasLegacy = SearchProperty is not null || SearchKeyword is not null;
         if ((Filter is not null && (hasLegacy || MatchAll)) || (MatchAll && hasLegacy))
             throw new ArgumentException("Advanced, legacy and match-all conditions cannot be mixed.");
         if (Filter is not null || MatchAll)

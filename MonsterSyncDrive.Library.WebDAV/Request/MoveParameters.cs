@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>
 /// 配置 MOVE 的覆盖策略，以及源资源和目标资源各自的锁条件。
@@ -41,17 +41,26 @@ public class MoveParameters : WebDavRequestOptions
     /// 获取或设置源资源的写锁令牌。
     /// </summary>
     /// <value>默认 null；非 null 时绑定源资源绝对 URI，避免与目标锁条件混淆。</value>
-    public string? SourceLockToken { get; set; }
+    public string? SourceLockToken
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置目标资源的写锁令牌。
     /// </summary>
     /// <value>默认 null；非 null 时绑定目标资源绝对 URI，和源锁放入同一 If 头。</value>
-    public string? DestLockToken { get; set; }
+    public string? DestLockToken
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置是否允许覆盖已存在的移动目标。
     /// </summary>
     /// <value>默认 true，发送 Overwrite: T；false 发送 F。</value>
-    public bool Overwrite { get; set; }
+    public bool Overwrite
+    {
+        get; set;
+    }
 }

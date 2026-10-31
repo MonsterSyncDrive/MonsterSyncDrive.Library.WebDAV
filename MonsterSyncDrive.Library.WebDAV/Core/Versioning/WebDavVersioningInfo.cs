@@ -23,14 +23,17 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core.Versioning;
 
 /// <summary>解析 RFC3253 的版本、工作资源、版本历史、工作区、活动和基线属性快照。</summary>
 /// <remarks>只读取成功 propstat 的属性；完整原始属性仍可从 Resource 访问，不把缺失属性推断为服务器不支持该能力。</remarks>
 public sealed class WebDavVersioningInfo
 {
     /// <summary>获取包含所有原始成功属性及失败属性状态的资源快照。</summary>
-    public WebDavResource Resource { get; }
+    public WebDavResource Resource
+    {
+        get;
+    }
 
     /// <summary>从资源快照读取版本控制信息。</summary>
     /// <param name="resource">由 PROPFIND 或版本报告返回的资源。</param>
@@ -102,10 +105,12 @@ public sealed class WebDavVersioningInfo
     {
         get
         {
-            var value = VersioningXml.Property(Resource, "unreserved")?.Value.Trim();
+            string? value = VersioningXml.Property(Resource, "unreserved")?.Value.Trim();
             return value switch
             {
-                null => null, "true" or "1" => true, "false" or "0" => false,
+                null => null,
+                "true" or "1" => true,
+                "false" or "0" => false,
                 _ => throw new InvalidDataException("DAV:unreserved must be an XML boolean.")
             };
         }
@@ -148,7 +153,10 @@ public sealed class WebDavVersioningInfo
     public IReadOnlyCollection<XName> SupportedReports => VersioningXml.Property(Resource, "supported-report-set")?.Elements(WebDavXml.Dav + "supported-report").Elements(WebDavXml.Dav + "report").SelectMany(element => element.Elements()).Select(element => element.Name).ToArray() ?? [];
 
     /// <summary>获取常用版本控制属性名称，供属性发现和版本历史报告显式请求。</summary>
-    public static IReadOnlyCollection<XName> PropertyNames { get; } = Array.AsReadOnly(new[]
+    public static IReadOnlyCollection<XName> PropertyNames
+    {
+        get;
+    } = Array.AsReadOnly(new[]
     {
         "resourcetype", "version-name", "creator-displayname", "comment", "checked-in", "checked-out",
         "version-history", "root-version", "version-set", "predecessor-set", "successor-set", "checkout-set",
@@ -164,12 +172,13 @@ public sealed class WebDavVersioningInfo
     /// <returns>服务器提供的 URI 引用，属性缺失时为 null。</returns>
     private string? SingleHref(string name)
     {
-        var property = VersioningXml.Property(Resource, name);
-        if (property is null) return null;
-        var values = property.Elements(WebDavXml.Dav + "href").ToArray();
-        if (values.Length != 1 || string.IsNullOrWhiteSpace(values[0].Value))
-            throw new InvalidDataException("Invalid DAV:" + name + " href property.");
-        return values[0].Value;
+        XElement? property = VersioningXml.Property(Resource, name);
+        if (property is null)
+            return null;
+        XElement[] values = property.Elements(WebDavXml.Dav + "href").ToArray();
+        return values.Length != 1 || string.IsNullOrWhiteSpace(values[0].Value)
+            ? throw new InvalidDataException("Invalid DAV:" + name + " href property.")
+            : values[0].Value;
     }
 }
 

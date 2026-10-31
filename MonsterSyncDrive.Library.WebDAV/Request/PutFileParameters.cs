@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core;
 using System.Net.Http.Headers;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>
 /// 配置 PUT 的媒体类型、锁条件、源流所有权和上传进度。
@@ -41,7 +41,10 @@ public class PutFileParameters : WebDavRequestOptions
     /// 获取或设置上传正文的累计字节进度接收器。
     /// </summary>
     /// <value>默认 null；每次成功写入一块数据后报告，本次 HTTP 正文重发时从零重新累计，不表示整个服务器事务已完成。</value>
-    public IProgress<long>? Progress { get; set; }
+    public IProgress<long>? Progress
+    {
+        get; set;
+    }
     /// <summary>
     /// 初始化 PutFileParameters 的默认请求设置。
     /// </summary>
@@ -55,11 +58,17 @@ public class PutFileParameters : WebDavRequestOptions
     /// 获取或设置 PUT 请求正文的媒体类型。
     /// </summary>
     /// <value>默认 application/octet-stream；设置文件的实际媒体类型不会对源字节进行编码转换。</value>
-    public MediaTypeHeaderValue ContentType { get; set; }
+    public MediaTypeHeaderValue ContentType
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 获取或设置覆盖受写锁保护资源时的锁令牌。
     /// </summary>
     /// <value>默认 null；存在时添加 If 条件，可同时使用 IfMatch 防止覆盖其他内容版本。</value>
-    public string? LockToken { get; set; }
+    public string? LockToken
+    {
+        get; set;
+    }
 }

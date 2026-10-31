@@ -21,26 +21,45 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core.Versioning;
+using MonsterSyncDrive.Library.WebDAV.Request.RedirectReferences;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Request;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core.RedirectReferences;
 
 /// <summary>描述服务器上的 RFC4437 重定向引用资源，不表示已跟随的普通 HTTP 重定向。</summary>
 public sealed class WebDavRedirectReference
 {
     /// <summary>获取完整资源属性和逐属性状态，包含未知扩展。</summary>
-    public WebDavResource Resource { get; }
+    public WebDavResource Resource
+    {
+        get;
+    }
     /// <summary>获取 resourcetype 是否声明 DAV:redirectref。</summary>
-    public bool IsRedirectReference { get; }
+    public bool IsRedirectReference
+    {
+        get;
+    }
     /// <summary>获取 reftarget 中的目标 URI 引用原文，未返回时为 null。</summary>
-    public string? Target { get; }
+    public string? Target
+    {
+        get;
+    }
     /// <summary>获取标准 temporary 或 permanent 生命周期，未返回或扩展类型时为 null。</summary>
-    public RedirectReferenceLifetime? Lifetime { get; }
+    public RedirectReferenceLifetime? Lifetime
+    {
+        get;
+    }
     /// <summary>获取完整生命周期元素名称，保留未来扩展的命名空间和名称。</summary>
-    public XName? LifetimeType { get; }
+    public XName? LifetimeType
+    {
+        get;
+    }
     /// <summary>获取查询引用时必须显式请求的属性名称。</summary>
-    public static IReadOnlyCollection<XName> PropertyNames { get; } = Array.AsReadOnly(new[]
+    public static IReadOnlyCollection<XName> PropertyNames
+    {
+        get;
+    } = Array.AsReadOnly(new[]
     {
         WebDavXml.Dav + "resourcetype", WebDavXml.Dav + "reftarget", WebDavXml.Dav + "redirect-lifetime"
     });
@@ -52,19 +71,20 @@ public sealed class WebDavRedirectReference
         ArgumentNullException.ThrowIfNull(resource);
         Resource = resource;
         IsRedirectReference = VersioningXml.Property(resource, "resourcetype")?.Element(WebDavXml.Dav + "redirectref") is not null;
-        var target = VersioningXml.Property(resource, "reftarget");
+        XElement? target = VersioningXml.Property(resource, "reftarget");
         if (target is not null)
         {
-            var hrefs = target.Elements(WebDavXml.Dav + "href").ToArray();
+            XElement[] hrefs = target.Elements(WebDavXml.Dav + "href").ToArray();
             if (hrefs.Length != 1 || string.IsNullOrWhiteSpace(hrefs[0].Value) || !Uri.TryCreate(hrefs[0].Value, UriKind.RelativeOrAbsolute, out _))
                 throw new InvalidDataException("DAV:reftarget must contain exactly one valid URI reference.");
             Target = hrefs[0].Value;
         }
-        var lifetime = VersioningXml.Property(resource, "redirect-lifetime");
+        XElement? lifetime = VersioningXml.Property(resource, "redirect-lifetime");
         if (lifetime is not null)
         {
-            var children = lifetime.Elements().ToArray();
-            if (children.Length != 1) throw new InvalidDataException("DAV:redirect-lifetime requires one lifetime element.");
+            XElement[] children = lifetime.Elements().ToArray();
+            if (children.Length != 1)
+                throw new InvalidDataException("DAV:redirect-lifetime requires one lifetime element.");
             LifetimeType = children[0].Name;
             Lifetime = LifetimeType == WebDavXml.Dav + "temporary" ? RedirectReferenceLifetime.Temporary
                 : LifetimeType == WebDavXml.Dav + "permanent" ? RedirectReferenceLifetime.Permanent : null;
@@ -77,8 +97,9 @@ public sealed class WebDavRedirectReference
     public Uri? ResolveTarget(Uri referenceUri)
     {
         ArgumentNullException.ThrowIfNull(referenceUri);
-        if (!referenceUri.IsAbsoluteUri) throw new ArgumentException("An absolute reference URI is required.", nameof(referenceUri));
-        return Target is null ? null : new Uri(referenceUri, Target);
+        return !referenceUri.IsAbsoluteUri
+            ? throw new ArgumentException("An absolute reference URI is required.", nameof(referenceUri))
+            : Target is null ? null : new Uri(referenceUri, Target);
     }
 }
 

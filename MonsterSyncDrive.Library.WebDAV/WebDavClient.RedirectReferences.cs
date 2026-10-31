@@ -21,10 +21,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV;
+using MonsterSyncDrive.Library.WebDAV.Core.RedirectReferences;
+using MonsterSyncDrive.Library.WebDAV.Core.Versioning;
+using MonsterSyncDrive.Library.WebDAV.Request;
+using MonsterSyncDrive.Library.WebDAV.Request.RedirectReferences;
+using MonsterSyncDrive.Library.WebDAV.Response;
+using MonsterSyncDrive.Library.WebDAV.Response.RedirectReferences;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Request;
-using MonsterSyncDrive.WebDAV.Response;
 
 namespace MonsterSyncDrive.WebDAV;
 
@@ -58,12 +62,12 @@ public sealed partial class WebDavClient
     /// <returns>引用定义及所有逐属性状态，不访问引用目标。</returns>
     public async Task<WebDavRedirectReferenceResponse> GetRedirectReferenceAsync(string requestUri, WebDavRequestOptions? options = null)
     {
-        var body = new XElement(WebDavXml.Dav + "propfind", VersioningXml.Prop(WebDavRedirectReference.PropertyNames));
-        var source = await SendDocumentRequestAsync(CreateUri(requestUri), "PROPFIND", body, options,
+        XElement body = new(WebDavXml.Dav + "propfind", VersioningXml.Prop(WebDavRedirectReference.PropertyNames));
+        WebDavDocumentResponse source = await SendDocumentRequestAsync(CreateUri(requestUri), "PROPFIND", body, options,
             [new("Apply-To-Redirect-Ref", "T"), new("Depth", "0")]).ConfigureAwait(false);
-        if (source.StatusCode is >= 200 and < 300 && (source.StatusCode != 207 || source.Document?.Name != WebDavXml.Dav + "multistatus"))
-            throw new InvalidDataException("Redirect reference discovery requires DAV:multistatus.");
-        return new WebDavRedirectReferenceResponse(source, false);
+        return source.StatusCode is >= 200 and < 300 && (source.StatusCode != 207 || source.Document?.Name != WebDavXml.Dav + "multistatus")
+            ? throw new InvalidDataException("Redirect reference discovery requires DAV:multistatus.")
+            : new WebDavRedirectReferenceResponse(source, false);
     }
 
     /// <summary>按标准顺序构建目标和生命周期，默认修改引用本身并禁止缓存修改请求。</summary>
@@ -81,16 +85,16 @@ public sealed partial class WebDavClient
             RedirectReferenceLifetime.Permanent => new XElement(WebDavXml.Dav + "permanent"),
             _ => throw new ArgumentOutOfRangeException(nameof(parameters), "Unknown redirect lifetime.")
         };
-        var body = VersioningXml.AddExtensions(new XElement(WebDavXml.Dav + root,
+        XElement body = VersioningXml.AddExtensions(new XElement(WebDavXml.Dav + root,
             parameters.Target is null ? null : new XElement(WebDavXml.Dav + "reftarget", VersioningXml.Href(parameters.Target)),
             lifetime is null ? null : new XElement(WebDavXml.Dav + "redirect-lifetime", lifetime)), parameters.ExtensionElements);
-        var source = await SendDocumentRequestAsync(CreateUri(requestUri), method, body, parameters,
+        WebDavDocumentResponse source = await SendDocumentRequestAsync(CreateUri(requestUri), method, body, parameters,
             [new("Apply-To-Redirect-Ref", "T"), new("Cache-Control", "no-cache")]).ConfigureAwait(false);
-        if (source.StatusCode is >= 200 and < 300 && source.Document is { } document
+        return source.StatusCode is >= 200 and < 300 && source.Document is { } document
             && document.Name != WebDavXml.Dav + (root + "-response")
-            && !(source.StatusCode == 207 && document.Name == WebDavXml.Dav + "multistatus"))
-            throw new InvalidDataException("Unexpected redirect reference response document.");
-        return new WebDavRedirectReferenceResponse(source, true);
+            && !(source.StatusCode == 207 && document.Name == WebDavXml.Dav + "multistatus")
+            ? throw new InvalidDataException("Unexpected redirect reference response document.")
+            : new WebDavRedirectReferenceResponse(source, true);
     }
 }
 

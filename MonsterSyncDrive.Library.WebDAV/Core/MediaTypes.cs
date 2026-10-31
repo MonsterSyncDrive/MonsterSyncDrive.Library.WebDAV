@@ -24,7 +24,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 为请求参数创建独立的标准 HTTP 正文媒体类型实例。

@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Helpers;
+namespace MonsterSyncDrive.Library.WebDAV.Helpers;
 
 /// <summary>
 /// 将各操作的深度枚举转换成协议允许的 Depth 请求头文本。
@@ -36,13 +36,16 @@ internal static class DepthHeaderHelper
     /// <param name="applyTo">待转换的 PROPFIND 深度枚举。</param>
     /// <returns>可直接写入 Depth 头的协议文本。</returns>
     /// <exception cref="ArgumentOutOfRangeException">枚举值不属于支持的深度范围。</exception>
-    public static string GetValueForPropfind(ApplyTo.Propfind applyTo) => applyTo switch
+    public static string GetValueForPropfind(ApplyTo.Propfind applyTo)
     {
-        ApplyTo.Propfind.ResourceOnly => "0",
-        ApplyTo.Propfind.ResourceAndChildren => "1",
-        ApplyTo.Propfind.ResourceAndAncestors => "infinity",
-        _ => throw new ArgumentOutOfRangeException(nameof(applyTo)),
-    };
+        return applyTo switch
+        {
+            ApplyTo.Propfind.ResourceOnly => "0",
+            ApplyTo.Propfind.ResourceAndChildren => "1",
+            ApplyTo.Propfind.ResourceAndAncestors => "infinity",
+            _ => throw new ArgumentOutOfRangeException(nameof(applyTo)),
+        };
+    }
 
     /// <summary>
     /// 把 COPY 范围转换为 0 或 infinity，拒绝不合法枚举。
@@ -50,12 +53,15 @@ internal static class DepthHeaderHelper
     /// <param name="applyTo">待转换的 COPY 深度枚举。</param>
     /// <returns>集合复制使用的 Depth 头文本。</returns>
     /// <exception cref="ArgumentOutOfRangeException">枚举值不属于支持的深度范围。</exception>
-    public static string GetValueForCopy(ApplyTo.Copy applyTo) => applyTo switch
+    public static string GetValueForCopy(ApplyTo.Copy applyTo)
     {
-        ApplyTo.Copy.ResourceOnly => "0",
-        ApplyTo.Copy.ResourceAndAncestors => "infinity",
-        _ => throw new ArgumentOutOfRangeException(nameof(applyTo)),
-    };
+        return applyTo switch
+        {
+            ApplyTo.Copy.ResourceOnly => "0",
+            ApplyTo.Copy.ResourceAndAncestors => "infinity",
+            _ => throw new ArgumentOutOfRangeException(nameof(applyTo)),
+        };
+    }
 
     /// <summary>
     /// 把 LOCK 范围转换为 0 或 infinity，拒绝不合法枚举。
@@ -63,10 +69,13 @@ internal static class DepthHeaderHelper
     /// <param name="applyTo">待转换的 LOCK 深度枚举。</param>
     /// <returns>锁创建使用的 Depth 头文本。</returns>
     /// <exception cref="ArgumentOutOfRangeException">枚举值不属于支持的深度范围。</exception>
-    public static string GetValueForLock(ApplyTo.Lock applyTo) => applyTo switch
+    public static string GetValueForLock(ApplyTo.Lock applyTo)
     {
-        ApplyTo.Lock.ResourceOnly => "0",
-        ApplyTo.Lock.ResourceAndAncestors => "infinity",
-        _ => throw new ArgumentOutOfRangeException(nameof(applyTo)),
-    };
+        return applyTo switch
+        {
+            ApplyTo.Lock.ResourceOnly => "0",
+            ApplyTo.Lock.ResourceAndAncestors => "infinity",
+            _ => throw new ArgumentOutOfRangeException(nameof(applyTo)),
+        };
+    }
 }

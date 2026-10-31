@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core.AccessControl;
+namespace MonsterSyncDrive.Library.WebDAV.Core.AccessControl;
 
 /// <summary>提供 RFC 3744 定义的权限名称；服务器也可以通过 XName 使用自定义权限。</summary>
 public static class WebDavPrivileges
@@ -63,27 +63,46 @@ public sealed class WebDavSupportedPrivilege
     /// <param name="children">被此权限聚合的直接子权限。</param>
     private WebDavSupportedPrivilege(XName name, bool isAbstract, string? description, string? language, IReadOnlyList<WebDavSupportedPrivilege> children)
     {
-        Name = name; IsAbstract = isAbstract; Description = description; Language = language; Children = children;
+        Name = name;
+        IsAbstract = isAbstract;
+        Description = description;
+        Language = language;
+        Children = children;
     }
 
     /// <summary>获取权限完整名称。</summary>
-    public XName Name { get; }
+    public XName Name
+    {
+        get;
+    }
     /// <summary>获取该权限是否只能描述树结构，而不能直接授予或拒绝。</summary>
-    public bool IsAbstract { get; }
+    public bool IsAbstract
+    {
+        get;
+    }
     /// <summary>获取人类可读说明。</summary>
-    public string? Description { get; }
+    public string? Description
+    {
+        get;
+    }
     /// <summary>获取说明的语言标记。</summary>
-    public string? Language { get; }
+    public string? Language
+    {
+        get;
+    }
     /// <summary>获取此权限聚合的直接子权限。</summary>
-    public IReadOnlyList<WebDavSupportedPrivilege> Children { get; }
+    public IReadOnlyList<WebDavSupportedPrivilege> Children
+    {
+        get;
+    }
 
     /// <summary>枚举当前节点及其所有后代，保留服务器声明的树顺序。</summary>
     /// <returns>深度优先的权限序列。</returns>
     public IEnumerable<WebDavSupportedPrivilege> DescendantsAndSelf()
     {
-        var pending = new Stack<WebDavSupportedPrivilege>();
+        Stack<WebDavSupportedPrivilege> pending = new();
         pending.Push(this);
-        while (pending.TryPop(out var current))
+        while (pending.TryPop(out WebDavSupportedPrivilege? current))
         {
             yield return current;
             for (var index = current.Children.Count - 1; index >= 0; index--)
@@ -108,10 +127,10 @@ public sealed class WebDavSupportedPrivilege
     {
         if (depth > 256 || element.Name != WebDavXml.Dav + "supported-privilege")
             throw new InvalidDataException("Invalid or excessively nested supported privilege.");
-        var names = element.Element(WebDavXml.Dav + "privilege")?.Elements().ToArray();
+        XElement[]? names = element.Element(WebDavXml.Dav + "privilege")?.Elements().ToArray();
         if (names is not { Length: 1 })
             throw new InvalidDataException("Supported privilege must contain exactly one privilege name.");
-        var description = element.Element(WebDavXml.Dav + "description");
+        XElement? description = element.Element(WebDavXml.Dav + "description");
         return new WebDavSupportedPrivilege(names[0].Name, element.Element(WebDavXml.Dav + "abstract") is not null,
             description?.Value, (string?)description?.Attribute(XNamespace.Xml + "lang"),
             Array.AsReadOnly(element.Elements(WebDavXml.Dav + "supported-privilege").Select(child => ParseNode(child, depth + 1)).ToArray()));

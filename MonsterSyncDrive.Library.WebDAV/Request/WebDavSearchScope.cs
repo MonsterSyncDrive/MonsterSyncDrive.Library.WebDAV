@@ -21,11 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Helpers;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Helpers;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>一个独立的搜索范围，支持多集合检索、深度及包含历史版本的标准选项。</summary>
 public sealed class WebDavSearchScope
@@ -46,20 +46,32 @@ public sealed class WebDavSearchScope
     }
 
     /// <summary>获取由服务器解释的搜索范围 URI。</summary>
-    public string Href { get; }
+    public string Href
+    {
+        get;
+    }
 
     /// <summary>获取该范围的搜索深度。</summary>
-    public ApplyTo.Propfind Depth { get; }
+    public ApplyTo.Propfind Depth
+    {
+        get;
+    }
 
     /// <summary>获取是否包含历史版本；服务器不支持时会返回协议错误。</summary>
-    public bool IncludeVersions { get; }
+    public bool IncludeVersions
+    {
+        get;
+    }
 
     /// <summary>构建按 RFC 5323 顺序排列的 href、depth 和可选 include-versions。</summary>
     /// <returns>独立的 DAV:scope 元素。</returns>
-    public XElement ToXElement() => new(WebDavXml.Dav + "scope",
+    public XElement ToXElement()
+    {
+        return new(WebDavXml.Dav + "scope",
         new XElement(WebDavXml.Dav + "href", Href),
         new XElement(WebDavXml.Dav + "depth", DepthHeaderHelper.GetValueForPropfind(Depth)),
         IncludeVersions ? new XElement(WebDavXml.Dav + "include-versions") : null);
+    }
 }
 
 /// <summary>一个搜索排序键，多实例按集合顺序组成稳定的多字段优先级。</summary>
@@ -77,19 +89,28 @@ public sealed class WebDavSearchOrder
     }
 
     /// <summary>获取排序属性名称；null 表示按全文相关性分数排序。</summary>
-    public XName? Property { get; }
+    public XName? Property
+    {
+        get;
+    }
 
     /// <summary>获取是否按降序排列。</summary>
-    public bool Descending { get; }
+    public bool Descending
+    {
+        get;
+    }
 
     /// <summary>获取可选大小写比较设置。</summary>
-    public bool? Caseless { get; }
+    public bool? Caseless
+    {
+        get;
+    }
 
     /// <summary>构造单个 DAV:order，分数字段使用 score 而不是 prop/score。</summary>
     /// <returns>独立的排序元素。</returns>
     public XElement ToXElement()
     {
-        var element = new XElement(WebDavXml.Dav + "order",
+        XElement element = new(WebDavXml.Dav + "order",
             Property is null ? new XElement(WebDavXml.Dav + "score")
                 : new XElement(WebDavXml.Dav + "prop", new XElement(Property)),
             new XElement(WebDavXml.Dav + (Descending ? "descending" : "ascending")));

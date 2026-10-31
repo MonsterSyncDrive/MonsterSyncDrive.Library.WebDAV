@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>
 /// 配置 MKCOL 创建集合时使用的父集合锁条件和通用请求选项。
@@ -32,5 +32,8 @@ public class MkColParameters : WebDavRequestOptions
     /// 获取或设置创建集合时需要提交的锁令牌。
     /// </summary>
     /// <value>默认 null；对请求 URI 添加无标记 If 条件，适用于继承的父集合锁。</value>
-    public string? LockToken { get; set; }
+    public string? LockToken
+    {
+        get; set;
+    }
 }

@@ -21,10 +21,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV;
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core.Bindings;
+using MonsterSyncDrive.Library.WebDAV.Core.Versioning;
+using MonsterSyncDrive.Library.WebDAV.Request;
+using MonsterSyncDrive.Library.WebDAV.Request.Bindings;
+using MonsterSyncDrive.Library.WebDAV.Response;
+using MonsterSyncDrive.Library.WebDAV.Response.Bindings;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Request;
-using MonsterSyncDrive.WebDAV.Response;
 
 namespace MonsterSyncDrive.WebDAV;
 
@@ -35,15 +40,19 @@ public sealed partial class WebDavClient
     /// <param name="collectionUri">接收新绑定的集合 URI。</param>
     /// <param name="parameters">源资源、绑定名称、覆盖与条件设置。</param>
     /// <returns>完整状态和绑定属性结果。</returns>
-    public Task<WebDavBindingResponse> BindAsync(string collectionUri, BindingParameters parameters) =>
-        ChangeBindingAsync(collectionUri, "BIND", "bind", parameters);
+    public Task<WebDavBindingResponse> BindAsync(string collectionUri, BindingParameters parameters)
+    {
+        return ChangeBindingAsync(collectionUri, "BIND", "bind", parameters);
+    }
 
     /// <summary>将已有绑定移动到指定集合和名称，保留资源的持久 resource-id。</summary>
     /// <param name="collectionUri">接收绑定的目标集合 URI。</param>
     /// <param name="parameters">源绑定 URI、目标名称、覆盖与条件设置。</param>
     /// <returns>完整状态和绑定属性结果。</returns>
-    public Task<WebDavBindingResponse> RebindAsync(string collectionUri, BindingParameters parameters) =>
-        ChangeBindingAsync(collectionUri, "REBIND", "rebind", parameters);
+    public Task<WebDavBindingResponse> RebindAsync(string collectionUri, BindingParameters parameters)
+    {
+        return ChangeBindingAsync(collectionUri, "REBIND", "rebind", parameters);
+    }
 
     /// <summary>仅解除集合中的一个绑定；服务器按剩余绑定和协议决定资源生命周期。</summary>
     /// <param name="collectionUri">包含绑定的集合 URI。</param>
@@ -52,8 +61,8 @@ public sealed partial class WebDavClient
     /// <returns>解除结果，包含可能的逐资源错误。</returns>
     public async Task<WebDavBindingResponse> UnbindAsync(string collectionUri, string segment, WebDavRequestOptions? options = null)
     {
-        var body = new XElement(WebDavXml.Dav + "unbind", new XElement(WebDavXml.Dav + "segment", BindingParameters.EncodeSegment(segment)));
-        var response = await SendDocumentRequestAsync(CreateUri(collectionUri), "UNBIND", body, options,
+        XElement body = new(WebDavXml.Dav + "unbind", new XElement(WebDavXml.Dav + "segment", BindingParameters.EncodeSegment(segment)));
+        WebDavDocumentResponse response = await SendDocumentRequestAsync(CreateUri(collectionUri), "UNBIND", body, options,
             [new("Cache-Control", "no-cache")]).ConfigureAwait(false);
         ValidateBindingDocument(response, "unbind-response", false);
         return new WebDavBindingResponse(response, true);
@@ -68,11 +77,13 @@ public sealed partial class WebDavClient
     {
         var depthHeader = depth switch
         {
-            ApplyTo.Propfind.ResourceOnly => "0", ApplyTo.Propfind.ResourceAndChildren => "1",
-            ApplyTo.Propfind.ResourceAndDescendants => "infinity", _ => throw new ArgumentOutOfRangeException(nameof(depth))
+            ApplyTo.Propfind.ResourceOnly => "0",
+            ApplyTo.Propfind.ResourceAndChildren => "1",
+            ApplyTo.Propfind.ResourceAndDescendants => "infinity",
+            _ => throw new ArgumentOutOfRangeException(nameof(depth))
         };
-        var body = new XElement(WebDavXml.Dav + "propfind", VersioningXml.Prop(WebDavBindingInfo.PropertyNames));
-        var response = await SendDocumentRequestAsync(CreateUri(requestUri), "PROPFIND", body, options,
+        XElement body = new(WebDavXml.Dav + "propfind", VersioningXml.Prop(WebDavBindingInfo.PropertyNames));
+        WebDavDocumentResponse response = await SendDocumentRequestAsync(CreateUri(requestUri), "PROPFIND", body, options,
             [new("Depth", depthHeader), new("DAV", "bind")]).ConfigureAwait(false);
         ValidateBindingDocument(response, "multistatus", true);
         return new WebDavBindingResponse(response, false);
@@ -88,10 +99,10 @@ public sealed partial class WebDavClient
     {
         ArgumentNullException.ThrowIfNull(parameters);
         ArgumentNullException.ThrowIfNull(parameters.Source);
-        var body = VersioningXml.AddExtensions(new XElement(WebDavXml.Dav + root,
+        XElement body = VersioningXml.AddExtensions(new XElement(WebDavXml.Dav + root,
             new XElement(WebDavXml.Dav + "segment", BindingParameters.EncodeSegment(parameters.Segment)),
             VersioningXml.Href(parameters.Source)), parameters.ExtensionElements);
-        var response = await SendDocumentRequestAsync(CreateUri(collectionUri), method, body, parameters,
+        WebDavDocumentResponse response = await SendDocumentRequestAsync(CreateUri(collectionUri), method, body, parameters,
             [new("Overwrite", parameters.Overwrite ? "T" : "F"), new("Cache-Control", "no-cache")]).ConfigureAwait(false);
         ValidateBindingDocument(response, root + "-response", false);
         return new WebDavBindingResponse(response, true);
@@ -103,7 +114,8 @@ public sealed partial class WebDavClient
     /// <param name="requireMultiStatus">查询必须收到 207 多状态文档。</param>
     private static void ValidateBindingDocument(WebDavDocumentResponse response, string expected, bool requireMultiStatus)
     {
-        if (response.StatusCode is < 200 or >= 300) return;
+        if (response.StatusCode is < 200 or >= 300)
+            return;
         if (requireMultiStatus && (response.StatusCode != 207 || response.Document?.Name != WebDavXml.Dav + "multistatus"))
             throw new InvalidDataException("Binding discovery requires DAV:multistatus.");
         if (response.Document is { } document && document.Name != WebDavXml.Dav + expected

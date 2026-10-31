@@ -23,7 +23,7 @@
  */
 using System.Buffers;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>只允许读取当前 MIME 分段的字节，不关闭共享的下一分段网络流。</summary>
 /// <remarks>用户关闭本段后，枚举器仍可排空其未读部分并进入下一段；枚举器前进后旧段不可再读取。</remarks>
@@ -68,14 +68,20 @@ internal sealed class ByteRangePartStream : Stream
     /// <summary>获取本段已知长度；完整正文没有声明长度时不支持查询。</summary>
     public override long Length => _length ?? throw new NotSupportedException("The full response length is unknown.");
     /// <summary>获取本段已消费的字节数；不支持修改位置。</summary>
-    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override long Position
+    {
+        get => _position; set => throw new NotSupportedException();
+    }
 
     /// <summary>同步读取本段剩余内容，严格禁止跨过 Content-Range 边界。</summary>
     /// <param name="buffer">接收正文的目标数组。</param>
     /// <param name="offset">目标数组中的写入偏移。</param>
     /// <param name="count">本次最多读取的字节数。</param>
     /// <returns>实际读取字节数，本段结束时为 0。</returns>
-    public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        return Read(buffer.AsSpan(offset, count));
+    }
 
     /// <summary>同步读取本段剩余字节。</summary>
     /// <param name="buffer">接收字节的内存区域。</param>
@@ -84,11 +90,18 @@ internal sealed class ByteRangePartStream : Stream
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _token.ThrowIfCancellationRequested();
-        var count = Limit(buffer.Length);
-        if (count == 0) return 0;
+        int count = Limit(buffer.Length);
+        if (count == 0)
+            return 0;
         int actual;
-        try { actual = _reader.Read(buffer[..count]); }
-        catch (Exception) when (_token.IsCancellationRequested) { throw new OperationCanceledException(_token); }
+        try
+        {
+            actual = _reader.Read(buffer[..count]);
+        }
+        catch (Exception) when (_token.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(_token);
+        }
         Advance(actual);
         return actual;
     }
@@ -99,8 +112,10 @@ internal sealed class ByteRangePartStream : Stream
     /// <param name="count">最多读取字节数。</param>
     /// <param name="cancellationToken">单次读取取消令牌。</param>
     /// <returns>读取完成任务，结果为实际字节数。</returns>
-    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
-        ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+    {
+        return ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+    }
 
     /// <summary>异步读取本段内容，并同时遵守请求与单次调用的取消令牌。</summary>
     /// <param name="buffer">接收字节的目标区域。</param>
@@ -109,18 +124,22 @@ internal sealed class ByteRangePartStream : Stream
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(_token, cancellationToken);
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(_token, cancellationToken);
         linked.Token.ThrowIfCancellationRequested();
-        var count = Limit(buffer.Length);
-        if (count == 0) return 0;
+        int count = Limit(buffer.Length);
+        if (count == 0)
+            return 0;
         using var abort = cancellationToken.UnsafeRegister(static value => ((Action)value!).Invoke(), _abort);
         try
         {
-            var actual = await _reader.ReadAsync(buffer[..count], linked.Token).ConfigureAwait(false);
+            int actual = await _reader.ReadAsync(buffer[..count], linked.Token).ConfigureAwait(false);
             Advance(actual);
             return actual;
         }
-        catch (Exception) when (linked.IsCancellationRequested) { throw new OperationCanceledException(linked.Token); }
+        catch (Exception) when (linked.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(linked.Token);
+        }
     }
 
     /// <summary>排空未读取的本段内容，以便枚举器安全进入下一段。</summary>
@@ -129,22 +148,28 @@ internal sealed class ByteRangePartStream : Stream
     /// <returns>当前分段剩余字节被消费完毕后完成的任务。</returns>
     public async Task DrainAsync(CancellationToken token)
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(8192);
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(8192);
         try
         {
             while (Limit(buffer.Length) is > 0 and var count)
             {
-                var actual = await _reader.ReadAsync(buffer.AsMemory(0, count), token).ConfigureAwait(false);
+                int actual = await _reader.ReadAsync(buffer.AsMemory(0, count), token).ConfigureAwait(false);
                 Advance(actual);
             }
         }
-        finally { ArrayPool<byte>.Shared.Return(buffer); }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     /// <summary>按本段剩余长度限制单次读取量。</summary>
     /// <param name="count">调用方请求的读取量。</param>
     /// <returns>不会越过本段末尾的读取量。</returns>
-    private int Limit(int count) => _ended ? 0 : (int)Math.Min(count, _remaining ?? count);
+    private int Limit(int count)
+    {
+        return _ended ? 0 : (int)Math.Min(count, _remaining ?? count);
+    }
 
     /// <summary>记录读取进度，并在已知长度提前结束时拒绝不完整正文。</summary>
     /// <param name="count">底层实际返回的字节数。</param>
@@ -152,34 +177,57 @@ internal sealed class ByteRangePartStream : Stream
     {
         if (count == 0)
         {
-            if (_remaining is > 0) throw new InvalidDataException("The byte-range part ended before Content-Range was satisfied.");
+            if (_remaining is > 0)
+                throw new InvalidDataException("The byte-range part ended before Content-Range was satisfied.");
             _ended = true;
             return;
         }
         _position += count;
-        if (_remaining.HasValue) _remaining -= count;
+        if (_remaining.HasValue)
+            _remaining -= count;
     }
 
     /// <summary>关闭当前分段的公开读取入口，不关闭共享的外层响应。</summary>
     /// <param name="disposing">是否执行托管清理。</param>
-    protected override void Dispose(bool disposing) { _disposed = true; base.Dispose(disposing); }
+    protected override void Dispose(bool disposing)
+    {
+        _disposed = true;
+        base.Dispose(disposing);
+    }
     /// <summary>异步关闭本段的公开读取入口。</summary>
     /// <returns>已经完成的释放任务。</returns>
-    public override ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
+    public override ValueTask DisposeAsync()
+    {
+        Dispose();
+        return ValueTask.CompletedTask;
+    }
     /// <summary>只读网络分段的 Flush 不执行任何写入。</summary>
-    public override void Flush() { }
+    public override void Flush()
+    {
+    }
     /// <summary>拒绝对共享的网络分段定位。</summary>
     /// <param name="offset">不被应用的字节偏移。</param>
     /// <param name="origin">不被应用的定位基准。</param>
     /// <returns>该操作始终抛出 NotSupportedException。</returns>
-    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+        throw new NotSupportedException();
+    }
+
     /// <summary>拒绝改变只读分段的长度。</summary>
     /// <param name="value">不被应用的新长度。</param>
-    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void SetLength(long value)
+    {
+        throw new NotSupportedException();
+    }
+
     /// <summary>拒绝向只读分段写入内容。</summary>
     /// <param name="buffer">不被读取的输入数组。</param>
     /// <param name="offset">不被应用的数组偏移。</param>
     /// <param name="count">不被应用的字节数。</param>
-    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
+    }
 }
 

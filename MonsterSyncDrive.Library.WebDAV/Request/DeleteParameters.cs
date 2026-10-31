@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>
 /// 配置 DELETE 的资源锁、HTTP 并发条件及取消行为。
@@ -32,5 +32,8 @@ public class DeleteParameters : WebDavRequestOptions
     /// 获取或设置删除受锁资源时提交的锁令牌。
     /// </summary>
     /// <value>默认 null；存在时作为作用于请求资源的 If 条件发送。</value>
-    public string? LockToken { get; set; }
+    public string? LockToken
+    {
+        get; set;
+    }
 }

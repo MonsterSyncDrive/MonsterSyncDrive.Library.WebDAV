@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request.RedirectReferences;
 
 /// <summary>指定 RFC4437 引用资源向客户端宣告的重定向生命周期。</summary>
 public enum RedirectReferenceLifetime
@@ -38,9 +38,15 @@ public enum RedirectReferenceLifetime
 public sealed class RedirectReferenceParameters : WebDavRequestOptions
 {
     /// <summary>获取或设置引用目标；创建时必需，修改时 null 表示不改变目标。允许其他 URI 方案和相对引用，不把目标限制为 HTTP。</summary>
-    public Uri? Target { get; set; }
+    public Uri? Target
+    {
+        get; set;
+    }
     /// <summary>获取或设置生命周期；创建时 null 使用服务器规定的 temporary，修改时 null 不改变。</summary>
-    public RedirectReferenceLifetime? Lifetime { get; set; }
+    public RedirectReferenceLifetime? Lifetime
+    {
+        get; set;
+    }
     /// <summary>获取或设置附加到标准正文后的扩展元素，发送前深复制。</summary>
     public IReadOnlyCollection<XElement> ExtensionElements { get; set; } = [];
 }

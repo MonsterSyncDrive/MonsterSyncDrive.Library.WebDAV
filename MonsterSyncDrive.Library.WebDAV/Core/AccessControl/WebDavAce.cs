@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core.AccessControl;
+namespace MonsterSyncDrive.Library.WebDAV.Core.AccessControl;
 
 /// <summary>指定 ACE 是授予权限还是拒绝权限。</summary>
 public enum WebDavAceAction
@@ -50,7 +50,7 @@ public sealed class WebDavAce
         ArgumentNullException.ThrowIfNull(privileges);
         if (!Enum.IsDefined(action))
             throw new ArgumentOutOfRangeException(nameof(action));
-        var names = privileges.Distinct().ToArray();
+        XName[] names = privileges.Distinct().ToArray();
         if (names.Length == 0 || names.Any(name => name is null))
             throw new ArgumentException("At least one privilege is required.", nameof(privileges));
         Principal = principal;
@@ -68,43 +68,57 @@ public sealed class WebDavAce
         _element = new XElement(element);
         if (element.Name != WebDavXml.Dav + "ace")
             throw new InvalidDataException("Expected DAV:ace.");
-        var principals = element.Elements().Where(node => node.Name == WebDavXml.Dav + "principal" || node.Name == WebDavXml.Dav + "invert").ToArray();
-        var actions = element.Elements().Where(node => node.Name == WebDavXml.Dav + "grant" || node.Name == WebDavXml.Dav + "deny").ToArray();
+        XElement[] principals = element.Elements().Where(node => node.Name == WebDavXml.Dav + "principal" || node.Name == WebDavXml.Dav + "invert").ToArray();
+        XElement[] actions = element.Elements().Where(node => node.Name == WebDavXml.Dav + "grant" || node.Name == WebDavXml.Dav + "deny").ToArray();
         if (principals.Length != 1 || actions.Length != 1)
             throw new InvalidDataException("An ACE needs one principal and exactly one grant or deny.");
         Principal = WebDavPrincipal.Parse(principals[0]);
         Action = actions[0].Name.LocalName == "grant" ? WebDavAceAction.Grant : WebDavAceAction.Deny;
-        var privilegeElements = actions[0].Elements(WebDavXml.Dav + "privilege").ToArray();
-        var names = privilegeElements.Select(value =>
+        XElement[] privilegeElements = actions[0].Elements(WebDavXml.Dav + "privilege").ToArray();
+        XName[] names = privilegeElements.Select(value =>
         {
-            var children = value.Elements().ToArray();
-            if (children.Length != 1) throw new InvalidDataException("DAV:privilege must contain one privilege name.");
-            return children[0].Name;
+            XElement[] children = value.Elements().ToArray();
+            return children.Length != 1 ? throw new InvalidDataException("DAV:privilege must contain one privilege name.") : children[0].Name;
         }).ToArray();
         if (names.Length == 0)
             throw new InvalidDataException("An ACE cannot contain an empty grant or deny.");
         Privileges = Array.AsReadOnly(names);
         IsProtected = element.Element(WebDavXml.Dav + "protected") is not null;
-        var inherited = element.Element(WebDavXml.Dav + "inherited");
+        XElement? inherited = element.Element(WebDavXml.Dav + "inherited");
         InheritedFrom = inherited?.Element(WebDavXml.Dav + "href")?.Value;
         if (inherited is not null && string.IsNullOrWhiteSpace(InheritedFrom))
             throw new InvalidDataException("Inherited ACE has no source href.");
     }
 
     /// <summary>获取此条目匹配的主体选择器。</summary>
-    public WebDavPrincipal Principal { get; }
+    public WebDavPrincipal Principal
+    {
+        get;
+    }
 
     /// <summary>获取授予或拒绝模式。</summary>
-    public WebDavAceAction Action { get; }
+    public WebDavAceAction Action
+    {
+        get;
+    }
 
     /// <summary>获取此条目列出的权限完整名称，保留原有顺序。</summary>
-    public IReadOnlyList<XName> Privileges { get; }
+    public IReadOnlyList<XName> Privileges
+    {
+        get;
+    }
 
     /// <summary>获取此条目是否由服务器保护，不能通过 ACL 请求修改。</summary>
-    public bool IsProtected { get; }
+    public bool IsProtected
+    {
+        get;
+    }
 
     /// <summary>获取继承条目的源资源 href；非继承条目为 null。</summary>
-    public string? InheritedFrom { get; }
+    public string? InheritedFrom
+    {
+        get;
+    }
 
     /// <summary>获取是否为当前资源可编辑的条目。</summary>
     public bool IsEditable => !IsProtected && InheritedFrom is null;
@@ -112,21 +126,28 @@ public sealed class WebDavAce
     /// <summary>解析服务器 ACE，保留完整 XML 供后续往返。</summary>
     /// <param name="element">完整 DAV:ace。</param>
     /// <returns>ACL 条目快照。</returns>
-    public static WebDavAce Parse(XElement element) => new(element ?? throw new ArgumentNullException(nameof(element)));
+    public static WebDavAce Parse(XElement element)
+    {
+        return new(element ?? throw new ArgumentNullException(nameof(element)));
+    }
 
     /// <summary>返回不共享内部节点的完整 ACE。</summary>
     /// <returns>包括保护与继承标志的独立 XML 元素。</returns>
-    public XElement ToXElement() => new(_element);
+    public XElement ToXElement()
+    {
+        return new(_element);
+    }
 
     /// <summary>在保留同一 ACE 扩展信息的前提下替换权限列表。</summary>
     /// <param name="privileges">新的非空权限集合。</param>
     /// <returns>更新后的条目副本。</returns>
     internal WebDavAce WithPrivileges(IEnumerable<XName> privileges)
     {
-        var names = privileges.Distinct().ToArray();
-        if (names.Length == 0) throw new ArgumentException("Privileges cannot be empty.", nameof(privileges));
-        var copy = ToXElement();
-        var action = copy.Element(WebDavXml.Dav + (Action == WebDavAceAction.Grant ? "grant" : "deny"))!;
+        XName[] names = privileges.Distinct().ToArray();
+        if (names.Length == 0)
+            throw new ArgumentException("Privileges cannot be empty.", nameof(privileges));
+        XElement copy = ToXElement();
+        XElement action = copy.Element(WebDavXml.Dav + (Action == WebDavAceAction.Grant ? "grant" : "deny"))!;
         action.Elements(WebDavXml.Dav + "privilege").Remove();
         action.Add(names.Select(name => new XElement(WebDavXml.Dav + "privilege", new XElement(name))));
         return Parse(copy);

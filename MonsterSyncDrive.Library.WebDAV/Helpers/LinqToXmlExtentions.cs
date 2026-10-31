@@ -21,9 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using System.Xml;
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Helpers;
+namespace MonsterSyncDrive.Library.WebDAV.Helpers;
 
 /// <summary>
 /// 提供 XML 声明序列化及内层 XML 读写辅助方法。
@@ -49,9 +50,9 @@ internal static class LinqToXmlExtentions
     /// <returns>不包含当前元素外层起止标签的内层 XML。</returns>
     public static string GetInnerXml(this XElement element)
     {
-        using (var reader = element.CreateReader())
+        using (XmlReader reader = element.CreateReader())
         {
-            reader.MoveToContent();
+            _ = reader.MoveToContent();
             return reader.ReadInnerXml();
         }
     }
@@ -63,5 +64,8 @@ internal static class LinqToXmlExtentions
     /// <param name="element">接收解析后子节点的目标元素。</param>
     /// <param name="innerXml">有效的内层 XML 片段；纯文本的特殊字符应先转义。</param>
     /// <exception cref="System.Xml.XmlException">片段不是有效 XML，或使用未声明的命名空间前缀。</exception>
-    public static void SetInnerXml(this XElement element, string innerXml) => element.ReplaceNodes(XElement.Parse("<dummy>" + innerXml + "</dummy>").Nodes());
+    public static void SetInnerXml(this XElement element, string innerXml)
+    {
+        element.ReplaceNodes(XElement.Parse("<dummy>" + innerXml + "</dummy>").Nodes());
+    }
 }

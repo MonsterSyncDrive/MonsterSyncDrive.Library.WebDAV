@@ -21,21 +21,34 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core.Versioning;
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core.Bindings;
 
 /// <summary>表示资源的持久身份及服务器允许当前用户看到的全部父绑定。</summary>
 public sealed class WebDavBindingInfo
 {
     /// <summary>获取原始资源及其完整属性、状态和扩展信息。</summary>
-    public WebDavResource Resource { get; }
+    public WebDavResource Resource
+    {
+        get;
+    }
     /// <summary>获取 DAV:resource-id 的全局唯一 URI；未支持或未成功返回时为 null。</summary>
-    public string? ResourceId { get; }
+    public string? ResourceId
+    {
+        get;
+    }
     /// <summary>获取父集合和成员名称配对；不递归访问父集合，因此集合环不会导致无限遍历。</summary>
-    public IReadOnlyCollection<WebDavBindingParent> Parents { get; }
+    public IReadOnlyCollection<WebDavBindingParent> Parents
+    {
+        get;
+    }
     /// <summary>获取本实现显式查询的绑定属性，避免昂贵的 allprop。</summary>
-    public static IReadOnlyCollection<XName> PropertyNames { get; } = Array.AsReadOnly(new[]
+    public static IReadOnlyCollection<XName> PropertyNames
+    {
+        get;
+    } = Array.AsReadOnly(new[]
     {
         WebDavXml.Dav + "resource-id", WebDavXml.Dav + "parent-set", WebDavXml.Dav + "resourcetype"
     });
@@ -46,7 +59,7 @@ public sealed class WebDavBindingInfo
     {
         ArgumentNullException.ThrowIfNull(resource);
         Resource = resource;
-        var id = VersioningXml.Property(resource, "resource-id");
+        XElement? id = VersioningXml.Property(resource, "resource-id");
         if (id is not null)
         {
             ResourceId = RequiredChild(id, "href");
@@ -63,10 +76,10 @@ public sealed class WebDavBindingInfo
     /// <returns>服务器原始文本，不对 URI 标识解码。</returns>
     private static string RequiredChild(XElement parent, string name)
     {
-        var values = parent.Elements(WebDavXml.Dav + name).ToArray();
-        if (values.Length != 1 || string.IsNullOrWhiteSpace(values[0].Value))
-            throw new InvalidDataException("Malformed DAV binding property: " + name);
-        return values[0].Value;
+        XElement[] values = parent.Elements(WebDavXml.Dav + name).ToArray();
+        return values.Length != 1 || string.IsNullOrWhiteSpace(values[0].Value)
+            ? throw new InvalidDataException("Malformed DAV binding property: " + name)
+            : values[0].Value;
     }
 }
 

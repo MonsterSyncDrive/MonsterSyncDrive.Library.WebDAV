@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response.Collections;
 
 /// <summary>保存集合 Add-Member 能力发现的 HTTP 状态及经过同源校验的上传端点。</summary>
 public sealed class AddMemberDiscoveryResponse : PropfindResponse
@@ -42,10 +42,16 @@ public sealed class AddMemberDiscoveryResponse : PropfindResponse
     }
 
     /// <summary>获取查询的集合绝对 URI。</summary>
-    public Uri CollectionUri { get; }
+    public Uri CollectionUri
+    {
+        get;
+    }
 
     /// <summary>获取同源 Add-Member URI；null 表示当前响应未提供可用端点。</summary>
-    public Uri? AddMemberUri { get; }
+    public Uri? AddMemberUri
+    {
+        get;
+    }
 
     /// <summary>获取响应是否成功提供了可用的创建成员端点。</summary>
     public bool IsSupported => IsSuccessful && AddMemberUri is not null;

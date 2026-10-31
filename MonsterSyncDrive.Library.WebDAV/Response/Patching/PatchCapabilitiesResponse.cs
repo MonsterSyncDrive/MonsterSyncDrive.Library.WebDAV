@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Helpers;
 using System.Net.Http.Headers;
-using MonsterSyncDrive.WebDAV.Helpers;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response.Patching;
 
 /// <summary>保存 OPTIONS 返回的 PATCH 能力及支持的补丁媒体类型。</summary>
 public sealed class PatchCapabilitiesResponse : WebDavResponse
@@ -38,16 +38,22 @@ public sealed class PatchCapabilitiesResponse : WebDavResponse
         Headers = response.Headers;
         Error = response.Error;
         AllowedMethods = (GetHeader("Allow") ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        var accept = GetHeader("Accept-Patch");
+        string? accept = GetHeader("Accept-Patch");
         AcceptedMediaTypes = accept is null ? [] : PreferenceHeaderParser.Split(accept, ',', allowEmptyItems: true)
             .Select(MediaTypeHeaderValue.Parse).ToArray();
     }
 
     /// <summary>获取服务器允许的方法名称集合。</summary>
-    public IReadOnlyCollection<string> AllowedMethods { get; }
+    public IReadOnlyCollection<string> AllowedMethods
+    {
+        get;
+    }
 
     /// <summary>获取服务器声明支持的补丁格式；没有 Accept-Patch 时为空集合。</summary>
-    public IReadOnlyCollection<MediaTypeHeaderValue> AcceptedMediaTypes { get; }
+    public IReadOnlyCollection<MediaTypeHeaderValue> AcceptedMediaTypes
+    {
+        get;
+    }
 
     /// <summary>获取 Allow 包含 PATCH 或存在 Accept-Patch 声明时的 PATCH 支持状态。</summary>
     public bool SupportsPatch => AcceptedMediaTypes.Count > 0 || AllowedMethods.Contains("PATCH", StringComparer.OrdinalIgnoreCase);
@@ -57,7 +63,7 @@ public sealed class PatchCapabilitiesResponse : WebDavResponse
     /// <returns>Accept-Patch 中存在匹配的主类型和子类型时为 true。</returns>
     public bool Accepts(string mediaType)
     {
-        var parsed = MediaTypeHeaderValue.Parse(mediaType);
+        MediaTypeHeaderValue parsed = MediaTypeHeaderValue.Parse(mediaType);
         return AcceptedMediaTypes.Any(value => string.Equals(value.MediaType, parsed.MediaType, StringComparison.OrdinalIgnoreCase));
     }
 }

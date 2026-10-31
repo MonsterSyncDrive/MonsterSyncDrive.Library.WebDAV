@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using MonsterSyncDrive.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response;
 
 /// <summary>表示一次同时查询活动锁和支持锁类型的单资源结果。</summary>
 /// <remarks>属性的 404/403 状态保留在 Resource.PropertyStatuses，不能把缺少锁能力属性当成服务器支持所有锁。</remarks>

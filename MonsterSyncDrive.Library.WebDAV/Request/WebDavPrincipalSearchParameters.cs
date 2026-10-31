@@ -23,7 +23,7 @@
  */
 using System.Xml.Linq;
 
-namespace MonsterSyncDrive.WebDAV.Request;
+namespace MonsterSyncDrive.Library.WebDAV.Request;
 
 /// <summary>表示 principal-property-search 的一组属性及其匹配文本。</summary>
 /// <remarks>同组属性及不同组条件均按 RFC 3744 进行逻辑 AND；文本匹配规则由服务器定义，不等同 DASL 查询。</remarks>
@@ -36,7 +36,7 @@ public sealed class WebDavPrincipalPropertySearch
     {
         ArgumentNullException.ThrowIfNull(properties);
         ArgumentNullException.ThrowIfNull(match);
-        var names = properties.Distinct().ToArray();
+        XName[] names = properties.Distinct().ToArray();
         if (names.Length == 0 || names.Any(name => name is null))
             throw new ArgumentException("A principal search requires at least one property.", nameof(properties));
         Properties = Array.AsReadOnly(names);
@@ -44,16 +44,25 @@ public sealed class WebDavPrincipalPropertySearch
     }
 
     /// <summary>获取需要同时匹配的属性完整名称。</summary>
-    public IReadOnlyList<XName> Properties { get; }
+    public IReadOnlyList<XName> Properties
+    {
+        get;
+    }
 
     /// <summary>获取服务器应匹配的原始文本。</summary>
-    public string Match { get; }
+    public string Match
+    {
+        get;
+    }
 
     /// <summary>生成 RFC 3744 的 property-search XML。</summary>
     /// <returns>独立的完整搜索条件元素。</returns>
-    public XElement ToXElement() => new(WebDavXml.Dav + "property-search",
+    public XElement ToXElement()
+    {
+        return new(WebDavXml.Dav + "property-search",
         new XElement(WebDavXml.Dav + "prop", Properties.Select(name => new XElement(name))),
         new XElement(WebDavXml.Dav + "match", Match));
+    }
 }
 
 /// <summary>配置主体属性搜索条件、结果属性以及主体集合搜索范围。</summary>
@@ -66,6 +75,9 @@ public sealed class WebDavPrincipalSearchParameters : WebDavRequestOptions
     public IReadOnlyCollection<XName> ReturnProperties { get; set; } = [];
 
     /// <summary>获取或设置是否改为搜索请求资源 DAV:principal-collection-set 中的所有主体集合。</summary>
-    public bool ApplyToPrincipalCollectionSet { get; set; }
+    public bool ApplyToPrincipalCollectionSet
+    {
+        get; set;
+    }
 }
 

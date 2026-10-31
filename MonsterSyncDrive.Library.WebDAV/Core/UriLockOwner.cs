@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-namespace MonsterSyncDrive.WebDAV.Core;
+namespace MonsterSyncDrive.Library.WebDAV.Core;
 
 /// <summary>
 /// 使用绝对 URI 描述 LOCK 请求的锁所有者。
@@ -44,5 +44,8 @@ public class UriLockOwner : LockOwner
     /// <summary>
     /// 获取构造时校验通过的绝对所有者 URI。
     /// </summary>
-    public override string Value { get; }
+    public override string Value
+    {
+        get;
+    }
 }

@@ -21,31 +21,53 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Core.Versioning;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
 
-namespace MonsterSyncDrive.WebDAV.Response;
+namespace MonsterSyncDrive.Library.WebDAV.Response.Versioning;
 
 /// <summary>保存某个目标资源的一份 DeltaV 报告，适用于直接报告及带 Depth 的逐资源报告封装。</summary>
 /// <remarks>Target 标识报告作用的资源；Resources 和 Items 标识报告内部的版本或查询结果，两种资源层次不可混淆。</remarks>
 public sealed class WebDavVersioningReport : WebDavResponse
 {
     /// <summary>获取报告作用的目标资源 URI，保留服务器 href 的相对或绝对形式。</summary>
-    public string? Target { get; }
+    public string? Target
+    {
+        get;
+    }
     /// <summary>获取原请求报告的完整名称，例如 DAV:version-tree 或 DAV:merge-preview。</summary>
-    public XName ReportName { get; }
+    public XName ReportName
+    {
+        get;
+    }
     /// <summary>获取 Depth 外层的资源和逐属性错误快照；直接报告没有该封装，值为 null。</summary>
-    public WebDavResource? Resource { get; }
+    public WebDavResource? Resource
+    {
+        get;
+    }
     /// <summary>获取此资源原始报告根，不含外层 multistatus；return=minimal 省略报告时为 null，失败报告可保留空属性元素。</summary>
-    public XElement? Document { get; }
+    public XElement? Document
+    {
+        get;
+    }
     /// <summary>获取报告是否按实际发送的 return=minimal 偏好被省略；此时 HTTP 状态可以为 200，但不能推断报告为空或资源没有变化。</summary>
-    public bool WasOmittedByMinimalPreference { get; }
+    public bool WasOmittedByMinimalPreference
+    {
+        get;
+    }
     /// <summary>获取服务器是否成功返回了可读取的原报告文档；与仅表示请求已处理的 HTTP 2xx 状态不同。</summary>
     public bool IsReportAvailable => base.IsSuccessful && !WasOmittedByMinimalPreference && Document is not null;
     /// <summary>获取报告内部 multistatus 的版本或查询结果资源，不包含 Depth 外层的目标资源。</summary>
-    public IReadOnlyCollection<WebDavResource> Resources { get; }
+    public IReadOnlyCollection<WebDavResource> Resources
+    {
+        get;
+    }
     /// <summary>获取报告内部资源对应的版本信息。</summary>
-    public IReadOnlyCollection<WebDavVersioningInfo> Items { get; }
+    public IReadOnlyCollection<WebDavVersioningInfo> Items
+    {
+        get;
+    }
     /// <summary>获取本份基线比较报告的新增、删除和变化版本。</summary>
     public IReadOnlyCollection<BaselineVersionChange> BaselineChanges => ReadBaselineChanges();
     /// <summary>获取本份合并预览报告的更新、冲突和忽略条目。</summary>
@@ -55,7 +77,7 @@ public sealed class WebDavVersioningReport : WebDavResponse
         ? RequiredHref(Document) : null;
     /// <summary>获取可用报告及其内部资源状态是否成功；被 minimal 省略时为 false，内部可选版本属性的 404 不使整份报告失败。</summary>
     /// <remarks>WasOmittedByMinimalPreference 区分合法省略与协议失败；StatusCode 仍保留服务器的 200，调用方可按需求重新请求完整报告。</remarks>
-    public override bool IsSuccessful => IsReportAvailable && Resources.All(resource => resource.StatusCode is null or >= 200 and < 300);
+    public override bool IsSuccessful => IsReportAvailable && Resources.All(resource => resource.StatusCode is null or (>= 200 and < 300));
 
     /// <summary>物化一个资源的报告及可选 Depth 封装上下文。</summary>
     /// <param name="target">报告目标 URI。</param>
@@ -87,11 +109,13 @@ public sealed class WebDavVersioningReport : WebDavResponse
     /// <returns>标准版本变化条目，未知扩展保留在 Document 中。</returns>
     private IReadOnlyCollection<BaselineVersionChange> ReadBaselineChanges()
     {
-        if (!IsSuccessful || Document?.Name != WebDavXml.Dav + "compare-baseline-report") return [];
-        var result = new List<BaselineVersionChange>();
-        foreach (var entry in Document.Elements())
+        if (!IsSuccessful || Document?.Name != WebDavXml.Dav + "compare-baseline-report")
+            return [];
+        List<BaselineVersionChange> result = [];
+        foreach (XElement entry in Document.Elements())
         {
-            if (entry.Name.Namespace != WebDavXml.Dav || entry.Name.LocalName is not ("added-version" or "deleted-version" or "changed-version")) continue;
+            if (entry.Name.Namespace != WebDavXml.Dav || entry.Name.LocalName is not ("added-version" or "deleted-version" or "changed-version"))
+                continue;
             var hrefs = entry.Elements(WebDavXml.Dav + "href").Select(element => element.Value).ToArray();
             if (hrefs.Length != (entry.Name.LocalName == "changed-version" ? 2 : 1) || hrefs.Any(string.IsNullOrWhiteSpace))
                 throw new InvalidDataException("Malformed compare-baseline entry.");
@@ -104,11 +128,13 @@ public sealed class WebDavVersioningReport : WebDavResponse
     /// <returns>标准合并预览条目，不主动访问 href 或执行合并。</returns>
     private IReadOnlyCollection<VersionMergePreview> ReadMergePreviews()
     {
-        if (!IsSuccessful || Document?.Name != WebDavXml.Dav + "merge-preview-report") return [];
-        var result = new List<VersionMergePreview>();
-        foreach (var entry in Document.Elements())
+        if (!IsSuccessful || Document?.Name != WebDavXml.Dav + "merge-preview-report")
+            return [];
+        List<VersionMergePreview> result = [];
+        foreach (XElement entry in Document.Elements())
         {
-            if (entry.Name.Namespace != WebDavXml.Dav || entry.Name.LocalName is not ("update-preview" or "conflict-preview" or "ignore-preview")) continue;
+            if (entry.Name.Namespace != WebDavXml.Dav || entry.Name.LocalName is not ("update-preview" or "conflict-preview" or "ignore-preview"))
+                continue;
             var target = entry.Name.LocalName == "ignore-preview" ? null : RequiredHref(entry.Element(WebDavXml.Dav + "target"));
             var version = RequiredHref(entry.Element(WebDavXml.Dav + "version"));
             var ancestor = entry.Name.LocalName == "conflict-preview" ? RequiredHref(entry.Element(WebDavXml.Dav + "common-ancestor")) : null;
@@ -122,10 +148,10 @@ public sealed class WebDavVersioningReport : WebDavResponse
     /// <returns>服务器提供的 URI 引用原文。</returns>
     private static string RequiredHref(XElement? container)
     {
-        var values = container?.Elements(WebDavXml.Dav + "href").ToArray();
-        if (values is not { Length: 1 } || string.IsNullOrWhiteSpace(values[0].Value))
-            throw new InvalidDataException("A DeltaV report requires exactly one href.");
-        return values[0].Value;
+        XElement[]? values = container?.Elements(WebDavXml.Dav + "href").ToArray();
+        return values is not { Length: 1 } || string.IsNullOrWhiteSpace(values[0].Value)
+            ? throw new InvalidDataException("A DeltaV report requires exactly one href.")
+            : values[0].Value;
     }
 }
 

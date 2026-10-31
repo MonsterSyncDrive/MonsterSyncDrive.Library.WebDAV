@@ -21,10 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+using MonsterSyncDrive.Library.WebDAV;
+using MonsterSyncDrive.Library.WebDAV.Core;
+using MonsterSyncDrive.Library.WebDAV.Request;
+using MonsterSyncDrive.Library.WebDAV.Response;
 using System.Xml.Linq;
-using MonsterSyncDrive.WebDAV.Core;
-using MonsterSyncDrive.WebDAV.Request;
-using MonsterSyncDrive.WebDAV.Response;
 
 namespace MonsterSyncDrive.WebDAV;
 
@@ -66,9 +67,9 @@ public sealed partial class WebDavClient
     public async Task<WebDavSearchResponse> SearchDocumentAsync(string requestUri, SearchParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
-        var body = SearchRequestBuilder.BuildRequest(parameters);
-        var uri = ResolveUri(CreateUri(requestUri));
-        var response = await SendDocumentRequestAsync(uri, "SEARCH", body, parameters).ConfigureAwait(false);
+        XElement body = SearchRequestBuilder.BuildRequest(parameters);
+        Uri uri = ResolveUri(CreateUri(requestUri));
+        WebDavDocumentResponse response = await SendDocumentRequestAsync(uri, "SEARCH", body, parameters).ConfigureAwait(false);
         return new WebDavSearchResponse(response, uri);
     }
 
@@ -79,9 +80,9 @@ public sealed partial class WebDavClient
     public async Task<WebDavSearchSchemaResponse> DiscoverSearchSchemaAsync(string requestUri, SearchParameters? parameters = null)
     {
         parameters ??= new SearchParameters();
-        var body = new XElement(WebDavXml.Dav + "query-schema-discovery",
+        XElement body = new(WebDavXml.Dav + "query-schema-discovery",
             new XElement(WebDavXml.Dav + "basicsearch", SearchRequestBuilder.BuildFrom(parameters)));
-        var response = await SendDocumentRequestAsync(CreateUri(requestUri), "SEARCH", body, parameters).ConfigureAwait(false);
+        WebDavDocumentResponse response = await SendDocumentRequestAsync(CreateUri(requestUri), "SEARCH", body, parameters).ConfigureAwait(false);
         return new WebDavSearchSchemaResponse(response);
     }
 
@@ -91,7 +92,7 @@ public sealed partial class WebDavClient
     /// <returns>保留发现状态和完整语法名称的结果。</returns>
     public async Task<WebDavSearchGrammarResponse> GetSearchGrammarsAsync(string requestUri, WebDavRequestOptions? options = null)
     {
-        var response = await QuerySearchPropertiesAsync(requestUri, [WebDavXml.Dav + "supported-query-grammar-set"], options).ConfigureAwait(false);
+        PropfindResponse response = await QuerySearchPropertiesAsync(requestUri, [WebDavXml.Dav + "supported-query-grammar-set"], options).ConfigureAwait(false);
         return new WebDavSearchGrammarResponse(response);
     }
 
@@ -101,7 +102,7 @@ public sealed partial class WebDavClient
     /// <returns>配额快照；缺失值为 null，对应失败属性状态仍保留。</returns>
     public async Task<WebDavQuotaResponse> GetQuotaAsync(string requestUri, WebDavRequestOptions? options = null)
     {
-        var response = await QuerySearchPropertiesAsync(requestUri,
+        PropfindResponse response = await QuerySearchPropertiesAsync(requestUri,
             [WebDavXml.Dav + "quota-used-bytes", WebDavXml.Dav + "quota-available-bytes"], options).ConfigureAwait(false);
         return new WebDavQuotaResponse(response);
     }
@@ -113,14 +114,13 @@ public sealed partial class WebDavClient
     /// <returns>完整属性查询结果。</returns>
     private Task<PropfindResponse> QuerySearchPropertiesAsync(string requestUri, IReadOnlyCollection<XName> properties, WebDavRequestOptions? options)
     {
-        var parameters = new PropfindParameters
+        PropfindParameters parameters = new()
         {
             ApplyTo = ApplyTo.Propfind.ResourceOnly,
             RequestType = PropfindRequestType.NamedProperties,
             CustomProperties = properties
         };
-        if (options is not null)
-            options.CopyTo(parameters);
+        options?.CopyTo(parameters);
         return Propfind(requestUri, parameters);
     }
 }
