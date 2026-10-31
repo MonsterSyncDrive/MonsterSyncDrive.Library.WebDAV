@@ -28,6 +28,8 @@ SOFTWARE.
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <!-- 随程序集生成 IntelliSense 使用的 XML API 文档，公开成员的注释由编译器一并校验。 -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsAotCompatible>true</IsAotCompatible>
@@ -41,7 +43,11 @@ SOFTWARE.
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DebugType>none</DebugType>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Update="**/*.cs" Pack="true" PackagePath="src/$(MSBuildProjectName)/" />
+  </ItemGroup>
 
 </Project>
